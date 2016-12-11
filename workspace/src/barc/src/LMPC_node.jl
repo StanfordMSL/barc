@@ -1,4 +1,4 @@
-#!/usr/bin/env julia
+#!/usr/bin/env julia4
 
 using RobotOS
 @rosimport barc.msg: ECU, pos_info
