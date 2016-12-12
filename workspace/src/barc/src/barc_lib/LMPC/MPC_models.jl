@@ -46,7 +46,7 @@ type MpcModel
         delay_df        = mpcParams.delay_df
         delay_a         = mpcParams.delay_a
 
-        acc_f           = 1.0
+        acc_f           = 1.0 #m: this is the filter right?
 
         n_poly_curv = trackCoeff.nPolyCurvature         # polynomial degree of curvature approximation
         
@@ -59,14 +59,14 @@ type MpcModel
 
         mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.08))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
 
-        @variable( mdl, z_Ol[1:(N+1),1:7])
+        @variable( mdl, z_Ol[1:(N+1),1:5])
         @variable( mdl, u_Ol[1:N,1:2])
         @variable( mdl, 0 <= ParInt <= 1)
         #@variable( mdl, eps[1:2] >= 0) # eps for soft lane constraints
         @variable( mdl, eps[1:N+1] >= 0) # eps for soft lane constraints
 
-        z_lb_6s = ones(mpcParams.N+1,1)*[0.1 -Inf -Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
-        z_ub_6s = ones(mpcParams.N+1,1)*[2.5  Inf Inf  Inf  Inf  Inf Inf]                      # upper bounds
+        z_lb_6s = ones(mpcParams.N+1,1)*[-Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
+        z_ub_6s = ones(mpcParams.N+1,1)*[Inf  Inf Inf  Inf  Inf]                      # upper bounds
         u_lb_6s = ones(mpcParams.N,1) * [-1.0  -0.3]                                         # lower bounds on steering
         u_ub_6s = ones(mpcParams.N,1) * [2.0   0.3]                                         # upper bounds
 
@@ -76,64 +76,77 @@ type MpcModel
                 setupperbound(u_Ol[j,i], u_ub_6s[j,i])
             end
         end
-        for i=1:7
+        for i=1:5
             for j=1:N+1
                 setlowerbound(z_Ol[j,i], z_lb_6s[j,i])
                 setupperbound(z_Ol[j,i], z_ub_6s[j,i])
             end
         end
 
-        @NLparameter(mdl, z0[i=1:7] == 0)
+        @NLparameter(mdl, z0[i=1:5] == 0)
         @NLparameter(mdl, coeff[i=1:n_poly_curv+1] == 0)
-        @NLparameter(mdl, c_Vx[i=1:3]  == 0)
-        @NLparameter(mdl, c_Vy[i=1:4]  == 0)
-        @NLparameter(mdl, c_Psi[i=1:3] == 0)
+        #@NLparameter(mdl, c_Vx[i=1:3]  == 0)
+        #@NLparameter(mdl, c_Vy[i=1:4]  == 0)
+        #@NLparameter(mdl, c_Psi[i=1:3] == 0)
         @NLparameter(mdl, coeffTermConst[i=1:order+1,j=1:2,k=1:5] == 0)
         @NLparameter(mdl, coeffTermCost[i=1:order+1,j=1:2] == 0)
         @NLparameter(mdl, uPrev[1:10,1:2] == 0)
 
         # Conditions for first solve:
         setvalue(z0[1],1)
-        setvalue(c_Vx[3],0.1)
+       # setvalue(c_Vx[3],0.1)
 
-        @NLconstraint(mdl, [i=1:7], z_Ol[1,i] == z0[i])
+        @NLconstraint(mdl, [i=1:5], z_Ol[1,i] == z0[i])
         #@NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] <=  ey_max + eps[1])
         #@NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] >= -ey_max - eps[2])
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] <= ey_max + eps[i])
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] >= -ey_max - eps[i])
 
         @NLexpression(mdl, c[i = 1:N], sum{coeff[j]*z_Ol[i,6]^(n_poly_curv-j+1),j=1:n_poly_curv} + coeff[n_poly_curv+1])
-        @NLexpression(mdl, dsdt[i = 1:N], (z_Ol[i,1]*cos(z_Ol[i,4]) - z_Ol[i,2]*sin(z_Ol[i,4]))/(1-z_Ol[i,5]*c[i]))
-        
+        #@NLexpression(mdl, dsdt[i = 1:N], (z_Ol[i,1]*cos(z_Ol[i,4]) - z_Ol[i,2]*sin(z_Ol[i,4]))/(1-z_Ol[i,5]*c[i]))
         println("Initializing model...")
 
         # System dynamics
-        for i=1:N
+        for i=1:N 
             if i<=delay_df
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy[1]*z_Ol[i,2]/z_Ol[i,1] + c_Vy[2]*z_Ol[i,1]*z_Ol[i,3] + c_Vy[3]*z_Ol[i,3]/z_Ol[i,1] + c_Vy[4]*uPrev[delay_df+1-i,2]) # yDot
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi[1]*z_Ol[i,3]/z_Ol[i,1] + c_Psi[2]*z_Ol[i,2]/z_Ol[i,1] + c_Psi[3]*uPrev[delay_df+1-i,2])                            # psiDot
+                @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(z_Ol[i,4]*cos(atan((1/2)*tan(uPrev[delay_df+1-i,2],2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i])  )  
+                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + dt * ( z_Ol[i,4]*sin(atan((1/2)*tan(uPrev[delay_df+1-i,2]) + z_Ol[i,3])) )
+                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + dt * ( z_Ol[i,4]*(1/l_B)*sin(atan((1/2)*tan(uPrev[delay_df+1-i,2])) - (c[i]*(z_Ol[i,4]*cos(atan((1/2)*tan(uPrev[delay_df+1-i,2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i]))) )
             else
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy[1]*z_Ol[i,2]/z_Ol[i,1] + c_Vy[2]*z_Ol[i,1]*z_Ol[i,3] + c_Vy[3]*z_Ol[i,3]/z_Ol[i,1] + c_Vy[4]*u_Ol[i-delay_df,2]) # yDot
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi[1]*z_Ol[i,3]/z_Ol[i,1] + c_Psi[2]*z_Ol[i,2]/z_Ol[i,1] + c_Psi[3]*u_Ol[i-delay_df,2])                            # psiDot
+                @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(z_Ol[i,4]*cos(atan((1/2)*tan(u_Ol[i-delay_df,2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i])  )  
+                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + dt * ( z_Ol[i,4]*sin(atan((1/2)*tan(u_Ol[i-delay_df,2]) + z_Ol[i,3])) )
+                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + dt * ( z_Ol[i,4]*(1/l_B)*sin(atan((1/2)*tan(u_Ol[i-delay_df,2])) - (c[i]*(z_Ol[i,4]*cos(atan((1/2)*tan(u_Ol[i-delay_df,2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i]))) )
+
             end
             if i<=delay_a
                 #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(uPrev[delay_a+1-i,1] - 0.5*z_Ol[i,1]))
                 #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*u_Ol[i,1])                              # xDot
-                @NLconstraint(mdl, z_Ol[i+1,7]  == z_Ol[i,7] + dt*(uPrev[delay_a+1-i,1]-z_Ol[i,7])*acc_f)
+                @NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(uPrev[delay_a+1-i,1]-z_Ol[i,5])*acc_f)
             else
                 #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*u_Ol[i,1])                              # xDot
-                @NLconstraint(mdl, z_Ol[i+1,7]  == z_Ol[i,7] + dt*(u_Ol[i-delay_a,1]-z_Ol[i,7])*acc_f)
+                @NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(u_Ol[i-delay_a,1]-z_Ol[i,5])*acc_f)
             end
-            #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*z_Ol[i,7])                               # xDot
-            #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(z_Ol[i,7] - 0.5*z_Ol[i,1]))                               # xDot
-            @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2]*z_Ol[i,3] + c_Vx[2]*z_Ol[i,1] + c_Vx[3]*z_Ol[i,7]) 
-            @NLconstraint(mdl, z_Ol[i+1,4]  == z_Ol[i,4] + dt*(z_Ol[i,3]-dsdt[i]*c[i]))                                                                                 # ePsi
-            @NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(z_Ol[i,1]*sin(z_Ol[i,4])+z_Ol[i,2]*cos(z_Ol[i,4])))                                                      # eY
-            @NLconstraint(mdl, z_Ol[i+1,6]  == z_Ol[i,6] + dt*dsdt[i]  )                                                                                                # s
+            
+            @NLconstraint(mdl, z_Ol[i+1,4]  == z_Ol[i,4] + dt * z_Ol[i,5])
+
+            #= Michael's proposed kinematic bicycle model equations, 
+            z[1] = s
+            z[2] = ey
+            z[3] = epsi
+            z[4] = v
+            z[5] = af
+            =#
+            #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*dsdt[i]  )  
+            #@NLconstraint(mdl, z_ol[i+1,2]  == z_ol[i,2] + dt * ( z_ol[i,4]*sin(betaF[i] + z_ol[i,3])) )
+            #@NLconstraint(mdl, z_ol[i+1,3]  == z_ol[i,3] + dt * ( z_ol[i,4]*(1/l_B)*sin(betaF[i]) - (c[i]*dsdt[i])) )
+            #@NLconstraint(mdl, z_ol[i+1,4]  == z_ol[i,4] + dt * z_ol[i,5])
+            #@NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(u_Ol[i-delay_a,1]-z_Ol[i,5])*acc_f)
+
+
         end
         # @NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] <= 0.05)
         # @NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] >= -0.2)
-        # for i=1:N-1 # Constraints on u:
+        # for i=1:N-1 # Constraints on u:S
         #     @NLconstraint(mdl, u_Ol[i+1,1]-u_Ol[i,1] <= 0.05)
         #     @NLconstraint(mdl, u_Ol[i+1,1]-u_Ol[i,1] >= -0.2)
         # end
@@ -149,7 +162,7 @@ type MpcModel
 
         # Derivative cost
         # ---------------------------------
-        @NLexpression(mdl, derivCost, sum{QderivZ[j]*(sum{(z_Ol[i,j]-z_Ol[i+1,j])^2,i=1:N}),j=1:6} +
+        @NLexpression(mdl, derivCost, sum{QderivZ[j]*(sum{(z_Ol[i,j]-z_Ol[i+1,j])^2,i=1:N}),j=1:4} +
                                           QderivU[1]*((uPrev[1,1]-u_Ol[1,1])^2+sum{(u_Ol[i,1]-u_Ol[i+1,1])^2,i=1:N-delay_a-1})+
                                           QderivU[2]*((uPrev[1,2]-u_Ol[1,2])^2+sum{(u_Ol[i,2]-u_Ol[i+1,2])^2,i=1:N-delay_df-1}))
 

@@ -77,17 +77,19 @@ function main()
     # Define and initialize variables
     # ---------------------------------------------------------------
     # General LMPC variables
-    oldTraj                     = OldTrajectory()
-    posInfo                     = PosInfo()
-    mpcCoeff                    = MpcCoeff()
-    lapStatus                   = LapStatus(1,1,false,false,0.3)
-    mpcSol                      = MpcSol()
+    oldTraj                     = OldTrajectory() #m: data structure to save information about prev. trajectories
+    posInfo                     = PosInfo() #m: information about current position s and s_target
+    mpcCoeff                    = MpcCoeff() #m: coefficients for SS-traj and cost approximation
+    lapStatus                   = LapStatus(1,1,false,false,0.3) #m: information about lap number and iteration as well as trigger and help variables
+    mpcSol                      = MpcSol() #m: ax, df and other decision variables that come out of mpc
     trackCoeff                  = TrackCoeff()      # info about track (at current position, approximated)
-    modelParams                 = ModelParams()
-    mpcParams                   = MpcParams()
+    modelParams                 = ModelParams() #m: car dimensions, weight, actuator constraints, etc.
+    mpcParams                   = MpcParams() #m: MPC horizon, weights, etc.
     mpcParams_pF                = MpcParams()       # for 1st lap (path following)
 
+    #m: Initialize all parameters with values defined in functions.jl
     InitializeParameters(mpcParams,mpcParams_pF,trackCoeff,modelParams,posInfo,oldTraj,mpcCoeff,lapStatus,buffersize)
+    # create two models: one for LMPC one for PF
     mdl    = MpcModel(mpcParams,mpcCoeff,modelParams,trackCoeff)
     mdl_pF = MpcModel_pF(mpcParams_pF,modelParams,trackCoeff)
 
@@ -269,15 +271,15 @@ function main()
 
             #cmd.header.stamp = get_rostime()
             cmd.motor = convert(Float32,mpcSol.a_x)
-            cmd.servo = convert(Float32,mpcSol.d_f)
+            cmd.servo = convert(Float32,mpcSol.d_f)    
             #publish(pub, cmd)
 
             # Write current input information
             uCurr[i,:] = [mpcSol.a_x mpcSol.d_f]
             zCurr[i,6] = posInfo.s%posInfo.s_target   # save absolute position in s (for oldTrajectory)
 
-            uPrev = circshift(uPrev,1)
-            uPrev[1,:] = uCurr[i,:]
+            uPrev = circshift(uPrev,1) #m: shift data by one up
+            uPrev[1,:] = uCurr[i,:] #m: change the first entry 
             #println("Finished solving, status: $(mpcSol.solverStatus), u = $(uCurr[i,:]), t = $(log_t_solv[k+1]) s")
 
             # Logging
