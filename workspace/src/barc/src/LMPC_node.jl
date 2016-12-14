@@ -39,32 +39,62 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
         lapStatus.switchLap = true
     end
 
+    try 
+    kkk = 0    
+    jjj = 0
     # save current state in oldTraj
     oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = z_est
+    kkk +=1
     oldTraj.oldInput[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = [msg.u_a,msg.u_df]
     #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap]-1,:,lapStatus.currentLap])
     oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap],lapStatus.currentLap] = to_sec(msg.header.stamp)
+    kkk +=1
     oldTraj.count[lapStatus.currentLap] += 1
+    kkk +=1
 
     # if necessary: append to end of previous lap
     if lapStatus.currentLap > 1 && z_est[6] < 16.0
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] = z_est
+            kkk +=1
+
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap-1],6,lapStatus.currentLap-1] += posInfo.s_target
+            kkk +=1
+
         oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] = [msg.u_a,msg.u_df]
+            kkk +=1
+
         #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1]-1,:,lapStatus.currentLap-1])
         oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap-1],lapStatus.currentLap-1] = to_sec(msg.header.stamp)
+            kkk +=1
+
         oldTraj.count[lapStatus.currentLap-1] += 1
+            kkk +=1
+
     end
 
     #if necessary: append to beginning of next lap
     if z_est[6] > posInfo.s_target - 16.0
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] = z_est
+        jjj += 1
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],6,lapStatus.currentLap+1] -= posInfo.s_target
+        jjj += 1
         oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] = [msg.u_a,msg.u_df]
+        jjj += 1
         #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1]-1,:,lapStatus.currentLap+1])
         oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap+1],lapStatus.currentLap+1] = to_sec(msg.header.stamp)
+        jjj += 1
         oldTraj.count[lapStatus.currentLap+1] += 1
+        jjj += 1
         oldTraj.idx_start[lapStatus.currentLap+1] = oldTraj.count[lapStatus.currentLap+1]
+        jjj += 1
+    end
+
+    finally
+        println("Error catched\n")
+        println("Line counters: kkk=$(kkk) and jjj=$(jjj)\n")
+        @show(oldTraj.count[lapStatus.currentLap+1])
+        @show(laPstatus.currentLap)
+        error("Probably the bound error occured!")
     end
 end
 
@@ -72,7 +102,7 @@ end
 function main()
     println("Starting LMPC node.")
 
-    buffersize                  = 3000       # size of oldTraj buffers
+    buffersize                  = 3000        # size of oldTraj buffers
 
     # Define and initialize variables
     # ---------------------------------------------------------------
@@ -250,6 +280,7 @@ function main()
                 #mpcCoeff.c_Vx[3] = max(mpcCoeff.c_Vx[3],0.1)
                 zCurr[i,7] = acc0
                 solveMpcProblem(mdl,mpcSol,mpcCoeff,mpcParams,trackCoeff,lapStatus,posInfo,modelParams,zCurr[i,:]',uPrev)
+                println("OldTraj.count = $(oldTraj.count[lapStatus.currentLap])") #m: Added for debugging of bounds error
                 acc0 = mpcSol.z[2,7]
                 acc_f[1] = mpcSol.z[1,7]
             end
