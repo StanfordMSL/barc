@@ -249,11 +249,11 @@ function main()
                 acc_f[1] = mpcSol.z[1,5]
                 acc0 = mpcSol.z[2,5]
             else                        # otherwise: use system-ID-model
-                #mpcCoeff.c_Vx[3] = max(mpcCoeff.c_Vx[3],0.1)
                 zCurr[i,7] = acc0
-                solveMpcProblem(mdl,mpcSol,mpcCoeff,mpcParams,trackCoeff,lapStatus,posInfo,modelParams,zCurr[i,:]',uPrev)
-                acc0 = mpcSol.z[2,7]
-                acc_f[1] = mpcSol.z[1,7]
+                zLMPC = [zCurr[i,6],zCurr[i,5],zCurr[i,4],norm(zCurr[i,1:2]),acc0]    
+                solveMpcProblem(mdl,mpcSol,mpcCoeff,mpcParams,trackCoeff,lapStatus,posInfo,modelParams,zLMPC,uPrev)
+                acc0 = mpcSol.z[2,5]
+                acc_f[1] = mpcSol.z[1,5]
             end
             log_t_solv[k+1] = toq()
 

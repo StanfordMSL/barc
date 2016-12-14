@@ -90,7 +90,7 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
 
     mpcCoeff.order              = 5
     mpcCoeff.coeffCost          = zeros(mpcCoeff.order+1,2)
-    mpcCoeff.coeffConst         = zeros(mpcCoeff.order+1,2,5)
+    mpcCoeff.coeffConst         = zeros(mpcCoeff.order+1,2,3)
     mpcCoeff.pLength            = 5*2*mpcParams.N        # small values here may lead to numerical problems since the functions are only approximated in a short horizon
     mpcCoeff.c_Vx               = zeros(3)
     mpcCoeff.c_Vy               = zeros(4)

@@ -48,14 +48,15 @@ function coeffConstraintCost(oldTraj::OldTrajectory, mpcCoeff::MpcCoeff, posInfo
     # Select the old data
     oldxDot         = oldTraj.oldTraj[:,1,selected_laps]::Array{Float64,3}
     oldyDot         = oldTraj.oldTraj[:,2,selected_laps]::Array{Float64,3}
-    oldpsiDot       = oldTraj.oldTraj[:,3,selected_laps]::Array{Float64,3}
+    #oldpsiDot       = oldTraj.oldTraj[:,3,selected_laps]::Array{Float64,3}
     oldePsi         = oldTraj.oldTraj[:,4,selected_laps]::Array{Float64,3}
     oldeY           = oldTraj.oldTraj[:,5,selected_laps]::Array{Float64,3}
     oldS            = oldTraj.oldTraj[:,6,selected_laps]::Array{Float64,3}
-    oldacc          = oldTraj.oldTraj[:,7,selected_laps]::Array{Float64,3}
-    olda            = oldTraj.oldInput[:,1,selected_laps]::Array{Float64,3}
-    olddF           = oldTraj.oldInput[:,2,selected_laps]::Array{Float64,3}
-    #olddF           = smooth(olddF,5)
+    oldV            = sqrt(oldxDot.^2 + oldyDot.^2 )
+    #oldacc          = oldTraj.oldTraj[:,7,selected_laps]::Array{Float64,3}
+    #olda            = oldTraj.oldInput[:,1,selected_laps]::Array{Float64,3}
+    #olddF           = oldTraj.oldInput[:,2,selected_laps]::Array{Float64,3}
+    ##olddF           = smooth(olddF,5)
 
     N_points        = size(oldTraj.oldTraj,1)     # second dimension = length (=buffersize)
 
@@ -108,11 +109,9 @@ function coeffConstraintCost(oldTraj::OldTrajectory, mpcCoeff::MpcCoeff, posInfo
     # Compute the coefficients
     #coeffConst = zeros(Order+1,2,5)
     for i=1:2
-        mpcCoeff.coeffConst[:,i,1]    = MatrixInterp[:,:,i]\oldxDot[vec_range[i]]
-        mpcCoeff.coeffConst[:,i,2]    = MatrixInterp[:,:,i]\oldyDot[vec_range[i]]
-        mpcCoeff.coeffConst[:,i,3]    = MatrixInterp[:,:,i]\oldpsiDot[vec_range[i]]
-        mpcCoeff.coeffConst[:,i,4]    = MatrixInterp[:,:,i]\oldePsi[vec_range[i]]
-        mpcCoeff.coeffConst[:,i,5]    = MatrixInterp[:,:,i]\oldeY[vec_range[i]]
+        mpcCoeff.coeffConst[:,i,1]    = MatrixInterp[:,:,i]\oldeY[vec_range[i]]
+        mpcCoeff.coeffConst[:,i,2]    = MatrixInterp[:,:,i]\oldePsi[vec_range[i]]
+        mpcCoeff.coeffConst[:,i,3]    = MatrixInterp[:,:,i]\oldV[vec_range[i]]
     end
 
     # Finished with calculating the constraint coefficients
@@ -130,6 +129,7 @@ function coeffConstraintCost(oldTraj::OldTrajectory, mpcCoeff::MpcCoeff, posInfo
             mpcCoeff.coeffCost[:,i]    = MatrixInterp[:,:,i]\bQfunction_Vector           # interpolate this vector with the given s
     end
 
+    #= m: System ID deactivated
     # --------------- SYSTEM IDENTIFICATION --------------- #
     # ----------------------------------------------------- #
 
@@ -241,6 +241,7 @@ function coeffConstraintCost(oldTraj::OldTrajectory, mpcCoeff::MpcCoeff, posInfo
     #mpcCoeff.c_Vy = [-0.006633028965076818,-0.02997779668710061,0.005781203137095575,0.10642934131787765]
     #mpcCoeff.coeffCost  = coeffCost
     #mpcCoeff.coeffConst = coeffConst
+    =#
     nothing
 end
 

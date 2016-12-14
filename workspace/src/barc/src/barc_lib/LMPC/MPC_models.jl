@@ -50,12 +50,7 @@ type MpcModel
 
         n_poly_curv = trackCoeff.nPolyCurvature         # polynomial degree of curvature approximation
         
-        # Path following mode:
-        # Create function-specific parameters
-        v_ref       = mpcParams.vPathFollowing
-        z_Ref::Array{Float64,2}
-        z_Ref       = cat(2,v_ref*ones(N+1,1),zeros(N+1,5))       # Reference trajectory: path following -> stay on line and keep constant velocity
-        u_Ref       = zeros(N,2)
+
 
         mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.08))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
 
@@ -65,21 +60,21 @@ type MpcModel
         #@variable( mdl, eps[1:2] >= 0) # eps for soft lane constraints
         @variable( mdl, eps[1:N+1] >= 0) # eps for soft lane constraints
 
-        z_lb_6s = ones(mpcParams.N+1,1)*[-Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
-        z_ub_6s = ones(mpcParams.N+1,1)*[Inf  Inf Inf  Inf  Inf]                      # upper bounds
-        u_lb_6s = ones(mpcParams.N,1) * [-1.0  -0.3]                                         # lower bounds on steering
-        u_ub_6s = ones(mpcParams.N,1) * [2.0   0.3]                                         # upper bounds
+        z_lb_4s = ones(mpcParams.N+1,1)*[-Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
+        z_ub_4s = ones(mpcParams.N+1,1)*[Inf  Inf Inf  Inf  Inf]                      # upper bounds
+        u_lb_4s = ones(mpcParams.N,1) * [-1.0  -0.3]                                         # lower bounds on steering
+        u_ub_4s = ones(mpcParams.N,1) * [2.0   0.3]                                         # upper bounds
 
         for i=1:2
             for j=1:N
-                setlowerbound(u_Ol[j,i], u_lb_6s[j,i])
-                setupperbound(u_Ol[j,i], u_ub_6s[j,i])
+                setlowerbound(u_Ol[j,i], u_lb_4s[j,i])
+                setupperbound(u_Ol[j,i], u_ub_4s[j,i])
             end
         end
         for i=1:5
             for j=1:N+1
-                setlowerbound(z_Ol[j,i], z_lb_6s[j,i])
-                setupperbound(z_Ol[j,i], z_ub_6s[j,i])
+                setlowerbound(z_Ol[j,i], z_lb_4s[j,i])
+                setupperbound(z_Ol[j,i], z_ub_4s[j,i])
             end
         end
 
@@ -93,63 +88,41 @@ type MpcModel
         @NLparameter(mdl, uPrev[1:10,1:2] == 0)
 
         # Conditions for first solve:
-        setvalue(z0[1],1)
+        setvalue(z0[1],1)   #m: Necessary? FIXME
        # setvalue(c_Vx[3],0.1)
 
         @NLconstraint(mdl, [i=1:5], z_Ol[1,i] == z0[i])
         #@NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] <=  ey_max + eps[1])
         #@NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] >= -ey_max - eps[2])
-        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] <= ey_max + eps[i])
-        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] >= -ey_max - eps[i])
+        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] <= ey_max + eps[i])
+        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] >= -ey_max - eps[i])
 
-        @NLexpression(mdl, c[i = 1:N], sum{coeff[j]*z_Ol[i,6]^(n_poly_curv-j+1),j=1:n_poly_curv} + coeff[n_poly_curv+1])
+        @NLexpression(mdl, c[i = 1:N], sum{coeff[j]*z_Ol[i,1]^(n_poly_curv-j+1),j=1:n_poly_curv} + coeff[n_poly_curv+1])
         #@NLexpression(mdl, dsdt[i = 1:N], (z_Ol[i,1]*cos(z_Ol[i,4]) - z_Ol[i,2]*sin(z_Ol[i,4]))/(1-z_Ol[i,5]*c[i]))
         println("Initializing model...")
 
         # System dynamics
-        for i=1:N 
+      for i=1:N
             if i<=delay_df
-                @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(z_Ol[i,4]*cos(atan((1/2)*tan(uPrev[delay_df+1-i,2],2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i])  )  
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + dt * ( z_Ol[i,4]*sin(atan((1/2)*tan(uPrev[delay_df+1-i,2]) + z_Ol[i,3])) )
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + dt * ( z_Ol[i,4]*(1/l_B)*sin(atan((1/2)*tan(uPrev[delay_df+1-i,2])) - (c[i]*(z_Ol[i,4]*cos(atan((1/2)*tan(uPrev[delay_df+1-i,2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i]))) )
+                @NLexpression(mdl, bta[i],  atan( L_a / (L_a + L_b) * tan( uPrev[delay_df+1-i,2] ) ) )
             else
-                @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(z_Ol[i,4]*cos(atan((1/2)*tan(u_Ol[i-delay_df,2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i])  )  
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + dt * ( z_Ol[i,4]*sin(atan((1/2)*tan(u_Ol[i-delay_df,2]) + z_Ol[i,3])) )
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + dt * ( z_Ol[i,4]*(1/l_B)*sin(atan((1/2)*tan(u_Ol[i-delay_df,2])) - (c[i]*(z_Ol[i,4]*cos(atan((1/2)*tan(u_Ol[i-delay_df,2])+ z_Ol[i,3]) /(1-z_Ol[i,2]*c[i]))) )
-
+                @NLexpression(mdl, bta[i],  atan( L_a / (L_a + L_b) * tan( u_Ol[i-delay_df,2] ) ) )
             end
             if i<=delay_a
-                #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(uPrev[delay_a+1-i,1] - 0.5*z_Ol[i,1]))
-                #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*u_Ol[i,1])                              # xDot
-                @NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(uPrev[delay_a+1-i,1]-z_Ol[i,5])*acc_f)
+                #@NLconstraint(mdl, z_Ol[i+1,4] == z_Ol[i,4] + dt*(uPrev[delay_a+1-i,1] - 0.5*z_Ol[i,4]))  # v
+                @NLconstraint(mdl, z_Ol[i+1,5] == z_Ol[i,5] + dt*(uPrev[delay_a+1-i,1] - z_Ol[i,5])*acc_f)  # v
             else
-                #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*u_Ol[i,1])                              # xDot
-                @NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(u_Ol[i-delay_a,1]-z_Ol[i,5])*acc_f)
+                #@NLconstraint(mdl, z_Ol[i+1,4] == z_Ol[i,4] + dt*(u_Ol[i-delay_a,1] - 0.5*z_Ol[i,4]))     # v
+                @NLconstraint(mdl, z_Ol[i+1,5] == z_Ol[i,5] + dt*(u_Ol[i-delay_a,1] - z_Ol[i,5])*acc_f)     # v
             end
-            
-            @NLconstraint(mdl, z_Ol[i+1,4]  == z_Ol[i,4] + dt * z_Ol[i,5])
 
-            #= Michael's proposed kinematic bicycle model equations, 
-            z[1] = s
-            z[2] = ey
-            z[3] = epsi
-            z[4] = v
-            z[5] = af
-            =#
-            #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*dsdt[i]  )  
-            #@NLconstraint(mdl, z_ol[i+1,2]  == z_ol[i,2] + dt * ( z_ol[i,4]*sin(betaF[i] + z_ol[i,3])) )
-            #@NLconstraint(mdl, z_ol[i+1,3]  == z_ol[i,3] + dt * ( z_ol[i,4]*(1/l_B)*sin(betaF[i]) - (c[i]*dsdt[i])) )
-            #@NLconstraint(mdl, z_ol[i+1,4]  == z_ol[i,4] + dt * z_ol[i,5])
-            #@NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(u_Ol[i-delay_a,1]-z_Ol[i,5])*acc_f)
-
-
+            @NLexpression(mdl, dsdt[i], z_Ol[i,4]*cos(z_Ol[i,3]+bta[i])/(1-z_Ol[i,2]*c[i]))
+            @NLconstraint(mdl, z_Ol[i+1,1] == z_Ol[i,1] + dt*dsdt[i]  )                                                # s
+            @NLconstraint(mdl, z_Ol[i+1,2] == z_Ol[i,2] + dt*z_Ol[i,4]*sin(z_Ol[i,3]+bta[i])  )                        # ey
+            @NLconstraint(mdl, z_Ol[i+1,3] == z_Ol[i,3] + dt*(z_Ol[i,4]/L_a*sin(bta[i])-dsdt[i]*c[i])  )               # epsi
+            @NLconstraint(mdl, z_Ol[i+1,4] == z_Ol[i,4] + dt*(z_Ol[i,5] - 0.5*z_Ol[i,4]))  # v
         end
-        # @NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] <= 0.05)
-        # @NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] >= -0.2)
-        # for i=1:N-1 # Constraints on u:S
-        #     @NLconstraint(mdl, u_Ol[i+1,1]-u_Ol[i,1] <= 0.05)
-        #     @NLconstraint(mdl, u_Ol[i+1,1]-u_Ol[i,1] >= -0.2)
-        # end
+
 
         @NLconstraint(mdl, u_Ol[1,2]-uPrev[1,2] <= 0.06)
         @NLconstraint(mdl, u_Ol[1,2]-uPrev[1,2] >= -0.06)
@@ -169,7 +142,7 @@ type MpcModel
         # Lane cost
         # ---------------------------------
         #@NLexpression(mdl, laneCost, sum{100000*eps[i]+1000*eps[i]^2,i=1:2})
-        @NLexpression(mdl, laneCost, sum{10*eps[i]+100*eps[i]^2,i=2:N+1})
+        @NLexpression(mdl, laneCost, sum{10*eps[i]+100*eps[i]^2,i=2:N+1}) #m: FIXME improve soft constraint not for every i a new eps
         
         # Lane cost
         # ---------------------------------
@@ -182,21 +155,21 @@ type MpcModel
 
         # Terminal constraints (soft), starting from 2nd lap
         # ---------------------------------
-        @NLexpression(mdl, constZTerm, sum{Q_term[j]*(ParInt*(sum{coeffTermConst[i,1,j]*z_Ol[N+1,6]^(order+1-i),i=1:order}+coeffTermConst[order+1,1,j])+
-                                            (1-ParInt)*(sum{coeffTermConst[i,2,j]*z_Ol[N+1,6]^(order+1-i),i=1:order}+coeffTermConst[order+1,2,j])-z_Ol[N+1,j])^2,j=1:5})
+        @NLexpression(mdl, constZTerm, sum{Q_term[j]*(ParInt*(sum{coeffTermConst[i,1,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,1,j])+
+                                            (1-ParInt)*(sum{coeffTermConst[i,2,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,2,j])-z_Ol[N+1,j])^2,j=2:4})
         
         # Terminal cost
         # ---------------------------------
         # The value of this cost determines how fast the algorithm learns. The higher this cost, the faster the control tries to reach the finish line.
-        @NLexpression(mdl, costZTerm, 1/5*(Q_term_cost*(ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,6]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
-                                      (1-ParInt)*(sum{coeffTermCost[i,2]*z_Ol[N+1,6]^(order+1-i),i=1:order}+coeffTermCost[order+1,2]))))
+        @NLexpression(mdl, costZTerm, 1/5*(Q_term_cost*(ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
+                                      (1-ParInt)*(sum{coeffTermCost[i,2]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,2]))))
         
         # State cost (only for path following mode)
         # ---------------------------------
         #@NLexpression(mdl, costZ, 0.5*sum{Q[i]*sum{(z_Ol[j,i]-z_Ref[j,i])^2,j=1:N+1},i=1:6})    # Follow trajectory
         #@NLexpression(mdl, costZ, 0.5*sum{(Q[1]*(sqrt(z_Ol[j,1]^2+z_Ol[j,2]^2)-1.0)^2 + Q[4]*z_Ol[j,4]^2 + Q[5]*z_Ol[j,5]^2),j=2:N+1})
 
-        @NLexpression(mdl, costZ, 0*QderivU[1]*sum{z_Ol[i,7],i=1:N})
+        @NLexpression(mdl, costZ, 0*QderivU[1]*sum{z_Ol[i,5],i=1:N})
         # Solve model once
         @NLobjective(mdl, Min, derivCost + constZTerm + costZTerm + laneCost + N*Q_term_cost)
         #@NLobjective(mdl, Min, derivCost + costZ)
