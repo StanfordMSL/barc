@@ -28,6 +28,10 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
     x_est[:]                  = [msg.x,msg.y,msg.psi,msg.v]
     trackCoeff.coeffCurvature = msg.coeffCurvature
 
+    kkk = 0
+    jjj = 0
+
+
     # check if lap needs to be switched
     if z_est[6] <= lapStatus.s_lapTrigger && lapStatus.switchLap
         oldTraj.idx_end[lapStatus.currentLap] = oldTraj.count[lapStatus.currentLap]
@@ -39,9 +43,7 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
         lapStatus.switchLap = true
     end
 
-    try 
-    kkk = 0    
-    jjj = 0
+    #try 
     # save current state in oldTraj
     oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = z_est
     kkk +=1
@@ -54,6 +56,9 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
 
     # if necessary: append to end of previous lap
     if lapStatus.currentLap > 1 && z_est[6] < 16.0
+            println("odTraj.count-1: $(oldTraj.count[lapStatus.currentLap-1])\n")
+
+      println("odTraj.count: $(oldTraj.count[lapStatus.currentLap])\n")
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] = z_est
             kkk +=1
 
@@ -74,6 +79,7 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
 
     #if necessary: append to beginning of next lap
     if z_est[6] > posInfo.s_target - 16.0
+
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] = z_est
         jjj += 1
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],6,lapStatus.currentLap+1] -= posInfo.s_target
@@ -88,21 +94,23 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
         oldTraj.idx_start[lapStatus.currentLap+1] = oldTraj.count[lapStatus.currentLap+1]
         jjj += 1
     end
-
-    finally
-        println("Error catched\n")
-        println("Line counters: kkk=$(kkk) and jjj=$(jjj)\n")
-        @show(oldTraj.count[lapStatus.currentLap+1])
-        @show(laPstatus.currentLap)
-        error("Probably the bound error occured!")
-    end
+    #=
+    catch err
+        if isa(err,BoundsError)
+            println("Error catched\n")
+            println("Line counters: kkk=$(kkk) and jjj=$(jjj)\n")
+            println("odTraj.count: $(oldTraj.count[lapStatus.currentLap+1])\n")
+            println("lapStatus: $(lapStatus.currentLap)\n")
+            error("Probably the bound error occured!")
+        end
+    end =#
 end
 
 # This is the main function, it is called when the node is started.
 function main()
     println("Starting LMPC node.")
 
-    buffersize                  = 3000        # size of oldTraj buffers
+    buffersize                  = 5000        # size of oldTraj buffers
 
     # Define and initialize variables
     # ---------------------------------------------------------------
