@@ -215,13 +215,13 @@ function main()
                 if lapStatus.currentLap <= n_pf
                     setvalue(mdl_pF.z_Ol[:,1],mpcSol.z[:,1]-posInfo.s_target)
                 elseif lapStatus.currentLap == n_pf+1
-                    setvalue(mdl.z_Ol[:,1],mpcSol.z[1:mpcParams.N+1,4])
-                    setvalue(mdl.z_Ol[:,6],mpcSol.z[1:mpcParams.N+1,1]-posInfo.s_target)
-                    setvalue(mdl.z_Ol[:,5],mpcSol.z[1:mpcParams.N+1,2])
-                    setvalue(mdl.z_Ol[:,4],mpcSol.z[1:mpcParams.N+1,3])
+                    setvalue(mdl.z_Ol[:,2],mpcSol.z[1:mpcParams.N+1,2])
+                    setvalue(mdl.z_Ol[:,1],mpcSol.z[1:mpcParams.N+1,1]-posInfo.s_target)
+                    setvalue(mdl.z_Ol[:,3],mpcSol.z[1:mpcParams.N+1,3])
+                    setvalue(mdl.z_Ol[:,4],mpcSol.z[1:mpcParams.N+1,4])
                     setvalue(mdl.u_Ol,mpcSol.u[1:mpcParams.N,:])
                 elseif lapStatus.currentLap > n_pf+1
-                    setvalue(mdl.z_Ol[:,6],mpcSol.z[:,6]-posInfo.s_target)
+                    setvalue(mdl.z_Ol[:,1],mpcSol.z[:,1]-posInfo.s_target)
                 end
             end
 
@@ -300,7 +300,7 @@ function main()
                 log_sol_z[1:mpcParams_pF.N+1,1:5,k]     = mpcSol.z        # only 4 states during path following mode (first 2 laps)
                 log_sol_u[1:mpcParams_pF.N,:,k]         = mpcSol.u
             else
-                log_sol_z[1:mpcParams.N+1,1:7,k]        = mpcSol.z
+                log_sol_z[1:mpcParams.N+1,1:5,k]        = mpcSol.z #m
                 log_sol_u[1:mpcParams.N,:,k]            = mpcSol.u
             end
 

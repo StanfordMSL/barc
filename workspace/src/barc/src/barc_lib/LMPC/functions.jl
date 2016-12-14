@@ -48,9 +48,9 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcParams.N                 = 12
     mpcParams.Q                 = [5.0,0.0,0.0,1.0,10.0,0.0]   # Q (only for path following mode)
     mpcParams.vPathFollowing    = 0.8                           # reference speed for first lap of path following
-    mpcParams.Q_term            = 1.0*[20.0,1.0,10.0,20.0,50.0]   # weights for terminal constraints (LMPC, for xDot,yDot,psiDot,ePsi,eY)
+    mpcParams.Q_term            = 1.0*[50.0,50.0,50.0]  #m # weights for terminal constraints (LMPC, for xDot,yDot,psiDot,ePsi,eY)
     mpcParams.R                 = 0*[10.0,10.0]                 # put weights on a and d_f
-    mpcParams.QderivZ           = 1.0*[1,1,1,1,1,0]             # cost matrix for derivative cost of states
+    mpcParams.QderivZ           = 1.0*[0,1,1,1] #m            # cost matrix for derivative cost of states
     mpcParams.QderivU           = 1.0*[5.0,40.0]                # cost matrix for derivative cost of inputs
     mpcParams.Q_term_cost       = 2.0                         # scaling of Q-function
     mpcParams.delay_df          = 3                             # steering delay
@@ -92,9 +92,9 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcCoeff.coeffCost          = zeros(mpcCoeff.order+1,2)
     mpcCoeff.coeffConst         = zeros(mpcCoeff.order+1,2,3)
     mpcCoeff.pLength            = 5*2*mpcParams.N        # small values here may lead to numerical problems since the functions are only approximated in a short horizon
-    mpcCoeff.c_Vx               = zeros(3)
-    mpcCoeff.c_Vy               = zeros(4)
-    mpcCoeff.c_Psi              = zeros(3)
+    #mpcCoeff.c_Vx               = zeros(3)
+    #mpcCoeff.c_Vy               = zeros(4)
+    #mpcCoeff.c_Psi              = zeros(3)
 
     lapStatus.currentLap        = 1         # initialize lap number
     lapStatus.currentIt         = 0         # current iteration in lap

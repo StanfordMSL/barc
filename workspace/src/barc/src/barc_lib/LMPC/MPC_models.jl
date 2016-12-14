@@ -83,7 +83,7 @@ type MpcModel
         #@NLparameter(mdl, c_Vx[i=1:3]  == 0)
         #@NLparameter(mdl, c_Vy[i=1:4]  == 0)
         #@NLparameter(mdl, c_Psi[i=1:3] == 0)
-        @NLparameter(mdl, coeffTermConst[i=1:order+1,j=1:2,k=1:5] == 0)
+        @NLparameter(mdl, coeffTermConst[i=1:order+1,j=1:2,k=1:3] == 0)
         @NLparameter(mdl, coeffTermCost[i=1:order+1,j=1:2] == 0)
         @NLparameter(mdl, uPrev[1:10,1:2] == 0)
 
@@ -156,7 +156,7 @@ type MpcModel
         # Terminal constraints (soft), starting from 2nd lap
         # ---------------------------------
         @NLexpression(mdl, constZTerm, sum{Q_term[j]*(ParInt*(sum{coeffTermConst[i,1,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,1,j])+
-                                            (1-ParInt)*(sum{coeffTermConst[i,2,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,2,j])-z_Ol[N+1,j])^2,j=2:4})
+                                            (1-ParInt)*(sum{coeffTermConst[i,2,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,2,j])-z_Ol[N+1,j+1])^2,j=1:3})
         
         # Terminal cost
         # ---------------------------------
