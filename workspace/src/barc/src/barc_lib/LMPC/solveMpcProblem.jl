@@ -25,9 +25,7 @@ function solveMpcProblem(mdl::MpcModel,mpcSol::MpcSol,mpcCoeff::MpcCoeff,mpcPara
     # Update current initial condition, curvature and System ID coefficients
     setvalue(mdl.z0,zCurr)
     setvalue(mdl.uPrev,uPrev)
-    setvalue(mdl.c_Vx,mpcCoeff.c_Vx)            # System ID coefficients
-    setvalue(mdl.c_Vy,mpcCoeff.c_Vy)
-    setvalue(mdl.c_Psi,mpcCoeff.c_Psi)
+
     setvalue(mdl.coeff,trackCoeff.coeffCurvature)       # Track curvature
     setvalue(mdl.coeffTermCost,mpcCoeff.coeffCost)      # Terminal cost
     setvalue(mdl.coeffTermConst,mpcCoeff.coeffConst)    # Terminal constraints

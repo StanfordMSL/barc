@@ -72,7 +72,7 @@ end
 function main()
     println("Starting LMPC node.")
 
-    buffersize                  = 3000       # size of oldTraj buffers
+    buffersize                  = 4000       # size of oldTraj buffers
 
     # Define and initialize variables
     # ---------------------------------------------------------------
@@ -104,8 +104,8 @@ function main()
 
     # Logging variables
     log_coeff_Cost              = NaN*ones(mpcCoeff.order+1,2,10000)
-    log_coeff_Const             = NaN*ones(mpcCoeff.order+1,2,5,10000)
-    log_sol_z                   = NaN*ones(max_N+1,7,10000)
+    log_coeff_Const             = NaN*ones(mpcCoeff.order+1,2,3,10000)
+    log_sol_z                   = NaN*ones(max_N+1,5,10000)
     log_sol_u                   = NaN*ones(max_N,2,10000)
     log_curv                    = zeros(10000,trackCoeff.nPolyCurvature+1)
     log_state_x                 = zeros(10000,4)
@@ -114,9 +114,9 @@ function main()
     log_t                       = zeros(10000,1)
     log_state                   = zeros(10000,7)
     log_cost                    = zeros(10000,6)
-    log_c_Vx                    = zeros(10000,3)
-    log_c_Vy                    = zeros(10000,4)
-    log_c_Psi                   = zeros(10000,3)
+    #log_c_Vx                    = zeros(10000,3)
+    #log_c_Vy                    = zeros(10000,4)
+    #log_c_Psi                   = zeros(10000,3)
     log_cmd                     = zeros(10000,2)
     log_step_diff               = zeros(10000,5)
     log_t_solv                  = zeros(10000)
@@ -293,9 +293,12 @@ function main()
             log_cost[k,:]           = mpcSol.cost
             log_curv[k,:]           = trackCoeff.coeffCurvature
             log_state_x[k,:]        = x_est
-            log_c_Vx[k,:]           = mpcCoeff.c_Vx
-            log_c_Vy[k,:]           = mpcCoeff.c_Vy
-            log_c_Psi[k,:]          = mpcCoeff.c_Psi
+            #log_c_Vx[k,:]           = mpcCoeff.c_Vx
+            #log_c_Vy[k,:]           = mpcCoeff.c_Vy
+            #log_c_Psi[k,:]          = mpcCoeff.c_Psi
+
+            #m: Taken away, at back later (assinment error)
+            #=
             if size(mpcSol.z,2) == 5
                 log_sol_z[1:mpcParams_pF.N+1,1:5,k]     = mpcSol.z        # only 4 states during path following mode (first 2 laps)
                 log_sol_u[1:mpcParams_pF.N,:,k]         = mpcSol.u
@@ -303,7 +306,7 @@ function main()
                 log_sol_z[1:mpcParams.N+1,1:5,k]        = mpcSol.z #m
                 log_sol_u[1:mpcParams.N,:,k]            = mpcSol.u
             end
-
+            =#
             # Count one up:
             lapStatus.currentIt += 1
         else

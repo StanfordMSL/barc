@@ -182,9 +182,9 @@ type MpcModel
         m.coeff = coeff
         m.z_Ol = z_Ol
         m.u_Ol = u_Ol
-        m.c_Vx = c_Vx
-        m.c_Vy = c_Vy
-        m.c_Psi = c_Psi
+        #m.c_Vx = c_Vx
+        #m.c_Vy = c_Vy
+        #m.c_Psi = c_Psi
         m.ParInt = ParInt
         m.uPrev = uPrev
 
