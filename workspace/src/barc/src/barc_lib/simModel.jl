@@ -124,6 +124,7 @@ function simDynModel_xy(z::Array{Float64},u::Array{Float64},dt::Float64,modelPar
 
     zNext = copy(z)
     # compute next state
+    # NOTE: (Michael) A term of -Fyf*sin(z[8]) might be mising in the v_x equation; also not sure about 2/m, 2/Iz
     zNext[1]        = zNext[1]       + dt * (cos(z[5])*z[3] - sin(z[5])*z[4])               # x
     zNext[2]        = zNext[2]       + dt * (sin(z[5])*z[3] + cos(z[5])*z[4])               # y
     zNext[3]        = zNext[3]       + dt * (z[7] + z[4]*z[6] - 0.5*z[3])                   # v_x
