@@ -261,7 +261,6 @@ function main()
                 #mpcCoeff.c_Vx[3] = max(mpcCoeff.c_Vx[3],0.1)
                 zCurr[i,7] = acc0
                 solveMpcProblem(mdl,mpcSol,mpcCoeff,mpcParams,trackCoeff,lapStatus,posInfo,modelParams,zCurr[i,:]',uPrev)
-                println("OldTraj.count = $(oldTraj.count[lapStatus.currentLap])") #m: Added for debugging of bounds error
                 acc0 = mpcSol.z[2,7]
                 acc_f[1] = mpcSol.z[1,7]
             end
