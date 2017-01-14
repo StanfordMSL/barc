@@ -246,7 +246,6 @@ function main()
                 tic()
                 coeffConstraintCost(oldTraj,mpcCoeff,posInfo,mpcParams,lapStatus)
                 tt = toq()
-                println("Finished coefficients, t = ",tt," s")
             end
 
             #println("Starting solving.")
