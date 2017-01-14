@@ -178,7 +178,7 @@ function eval_run(code::AbstractString)
 
     figure()
     title("v measurements and estimate")
-    plot(vel_est.t-t0,vel_est.z[:,1],"-x",pos_info.t-t0,pos_info.z[:,[8:9,4]],"-+")
+    plot(vel_est.t-t0,vel_est.z[:,1],"-x",pos_info.t-t0,pos_info.z[:,[8:9;4]],"-+")
     legend(["v_raw","est_xDot","est_yDot","est_v"])
     grid()
 
@@ -425,13 +425,19 @@ function eval_LMPC(code::AbstractString)
     # *********** CURVATURE *********************
     figure()
     c = zeros(size(curv,1),1)
+    nPolyCurvature = size(curv,2) - 1
     for i=1:size(curv,1)
         s = state[i,6]
-        #c[i] = ([s.^8 s.^7 s.^6 s.^5 s.^4 s.^3 s.^2 s.^1 s.^0] * curv[i,:]')[1]
-        c[i] = ([s.^6 s.^5 s.^4 s.^3 s.^2 s.^1 s.^0] * curv[i,:]')[1]
-        #c[i] = ([s.^3 s.^2 s.^1 s.^0] * curv[i,:]')[1]
+        j=0:nPolyCurvature
+        curvTemp = 0
+            for j=0:nPolyCurvature
+                curvTemp += s^j * curv[i,nPolyCurvature-j+1] 
+            end
+        c[i] = curvTemp
     end
     plot(state[:,6],c,"-o")
+
+    #=
     for i=1:5:size(curv,1)
         if isnan(sol_z[1,6,i])
             s = sol_z[:,1,i]
@@ -439,11 +445,12 @@ function eval_LMPC(code::AbstractString)
             s = sol_z[:,6,i]
         end
         c = zeros(size(curv,1),1)
-        #c = [s.^8 s.^7 s.^6 s.^5 s.^4 s.^3 s.^2 s.^1 s.^0] * curv[i,:]'
-        c = [s.^6 s.^5 s.^4 s.^3 s.^2 s.^1 s.^0] * curv[i,:]'
+        c = [s.^8 s.^7 s.^6 s.^5 s.^4 s.^3 s.^2 s.^1 s.^0] * curv[i,:]'
+        #c = [s.^6 s.^5 s.^4 s.^3 s.^2 s.^1 s.^0] * curv[i,:]'
         #c = [s.^3 s.^2 s.^1 s.^0] * curv[i,:]'
         plot(s,c,"-*")
     end
+    =#
     title("Curvature over path")
     xlabel("Curvilinear abscissa [m]")
     ylabel("Curvature")

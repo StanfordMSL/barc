@@ -114,9 +114,9 @@ function main()
     log_t                       = zeros(10000,1)
     log_state                   = zeros(10000,7)
     log_cost                    = zeros(10000,6)
-    #log_c_Vx                    = zeros(10000,3)
-    #log_c_Vy                    = zeros(10000,4)
-    #log_c_Psi                   = zeros(10000,3)
+    log_c_Vx                    = zeros(10000,3)
+    log_c_Vy                    = zeros(10000,4)
+    log_c_Psi                   = zeros(10000,3)
     log_cmd                     = zeros(10000,2)
     log_step_diff               = zeros(10000,5)
     log_t_solv                  = zeros(10000)
@@ -171,7 +171,7 @@ function main()
 
     uPrev = zeros(10,2)     # saves the last 10 inputs (1 being the most recent one)
 
-    n_pf = 3               # number of first path-following laps (needs to be at least 2)
+    n_pf = 2               # number of first path-following laps (needs to be at least 2)
 
     acc0 = 0.0
     opt_count = 0
@@ -237,7 +237,6 @@ function main()
                 tic()
                 coeffConstraintCost(oldTraj,mpcCoeff,posInfo,mpcParams,lapStatus)
                 tt = toq()
-                println("Finished coefficients, t = ",tt," s")
             end
 
             #println("Starting solving.")

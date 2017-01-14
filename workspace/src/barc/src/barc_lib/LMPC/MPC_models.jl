@@ -52,7 +52,7 @@ type MpcModel
         
 
 
-        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.08))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
+        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.2))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
 
         @variable( mdl, z_Ol[1:(N+1),1:5])
         @variable( mdl, u_Ol[1:N,1:2])
@@ -62,8 +62,8 @@ type MpcModel
 
         z_lb_4s = ones(mpcParams.N+1,1)*[-Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
         z_ub_4s = ones(mpcParams.N+1,1)*[Inf  Inf Inf  Inf  Inf]                      # upper bounds
-        u_lb_4s = ones(mpcParams.N,1) * [-1.0  -0.3]                                         # lower bounds on steering
-        u_ub_4s = ones(mpcParams.N,1) * [2.0   0.3]                                         # upper bounds
+        u_lb_4s = ones(mpcParams.N,1) * [-1.0  -0.2]                                         # lower bounds on inputs
+        u_ub_4s = ones(mpcParams.N,1) * [2.0   0.2]                                         # upper bounds
 
         for i=1:2
             for j=1:N
