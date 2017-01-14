@@ -48,6 +48,19 @@ type MpcModel
 
         acc_f           = 1.0
 
+        # identified system parameters
+        c_Vx1 = -0.07180500739657202
+        c_Vx2 = -0.09745914885807667
+        c_Vx3 = 0.20428541637830308
+        c_Vy1 = -0.5604464371949326
+        c_Vy2 = -0.0026778881078367424
+        c_Vy3 = 0.10449300305620522
+        c_Vy4 = -0.16279116816645695
+        c_Psi1 = -0.4828479437301086
+        c_Psi2 = -0.25196103153406685
+        c_Psi3 = 2.191800531472544
+
+
         n_poly_curv = trackCoeff.nPolyCurvature         # polynomial degree of curvature approximation
         
         # Path following mode:
@@ -110,11 +123,11 @@ type MpcModel
         # System dynamics
         for i=1:N
             if i<=delay_df
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy[1]*z_Ol[i,2]/z_Ol[i,1] + c_Vy[2]*z_Ol[i,1]*z_Ol[i,3] + c_Vy[3]*z_Ol[i,3]/z_Ol[i,1] + c_Vy[4]*uPrev[delay_df+1-i,2]) # yDot
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi[1]*z_Ol[i,3]/z_Ol[i,1] + c_Psi[2]*z_Ol[i,2]/z_Ol[i,1] + c_Psi[3]*uPrev[delay_df+1-i,2])                            # psiDot
+                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy1*z_Ol[i,2]/z_Ol[i,1] + c_Vy2*z_Ol[i,1]*z_Ol[i,3] + c_Vy3*z_Ol[i,3]/z_Ol[i,1] + c_Vy4*uPrev[delay_df+1-i,2]) # yDot
+                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi1*z_Ol[i,3]/z_Ol[i,1] + c_Psi2*z_Ol[i,2]/z_Ol[i,1] + c_Psi3*uPrev[delay_df+1-i,2])                            # psiDot
             else
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy[1]*z_Ol[i,2]/z_Ol[i,1] + c_Vy[2]*z_Ol[i,1]*z_Ol[i,3] + c_Vy[3]*z_Ol[i,3]/z_Ol[i,1] + c_Vy[4]*u_Ol[i-delay_df,2]) # yDot
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi[1]*z_Ol[i,3]/z_Ol[i,1] + c_Psi[2]*z_Ol[i,2]/z_Ol[i,1] + c_Psi[3]*u_Ol[i-delay_df,2])                            # psiDot
+                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy1*z_Ol[i,2]/z_Ol[i,1] + c_Vy2*z_Ol[i,1]*z_Ol[i,3] + c_Vy3*z_Ol[i,3]/z_Ol[i,1] + c_Vy4*u_Ol[i-delay_df,2]) # yDot
+                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi1*z_Ol[i,3]/z_Ol[i,1] + c_Psi2*z_Ol[i,2]/z_Ol[i,1] + c_Psi3*u_Ol[i-delay_df,2])                            # psiDot
             end
             if i<=delay_a
                 #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(uPrev[delay_a+1-i,1] - 0.5*z_Ol[i,1]))
@@ -126,7 +139,7 @@ type MpcModel
             end
             #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*z_Ol[i,7])                               # xDot
             #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(z_Ol[i,7] - 0.5*z_Ol[i,1]))                               # xDot
-            @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2]*z_Ol[i,3] + c_Vx[2]*z_Ol[i,1] + c_Vx[3]*z_Ol[i,7]) 
+            @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx1*z_Ol[i,2]*z_Ol[i,3] + c_Vx2*z_Ol[i,1] + c_Vx3*z_Ol[i,7]) 
             @NLconstraint(mdl, z_Ol[i+1,4]  == z_Ol[i,4] + dt*(z_Ol[i,3]-dsdt[i]*c[i]))                                                                                 # ePsi
             @NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(z_Ol[i,1]*sin(z_Ol[i,4])+z_Ol[i,2]*cos(z_Ol[i,4])))                                                      # eY
             @NLconstraint(mdl, z_Ol[i+1,6]  == z_Ol[i,6] + dt*dsdt[i]  )                                                                                                # s
