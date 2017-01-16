@@ -60,6 +60,19 @@ type MpcModel
         c_Psi2 = -0.25196103153406685
         c_Psi3 = 2.191800531472544
 
+        # faster coefficients
+
+        # c_Vx1 = 0.01995650235466099
+        # c_Vx2 = -0.1572168025054484
+        # c_Vx3 = 0.2915737506289591
+        # c_Vy1 = -0.779724838675871
+        # c_Vy2 = -0.010641853192254035
+        # c_Vy3 = 0.2531647067988133
+        # c_Vy4 = -0.2207018090849483
+        # c_Psi1 = -1.130943648603171
+        # c_Psi2 = 0.07174867616659654
+        # c_Psi3 = 3.9174565004808173
+
 
         n_poly_curv = trackCoeff.nPolyCurvature         # polynomial degree of curvature approximation
         
@@ -70,7 +83,7 @@ type MpcModel
         z_Ref       = cat(2,v_ref*ones(N+1,1),zeros(N+1,5))       # Reference trajectory: path following -> stay on line and keep constant velocity
         u_Ref       = zeros(N,2)
 
-        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.09))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
+        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.08))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
 
         @variable( mdl, z_Ol[1:(N+1),1:7])
         @variable( mdl, u_Ol[1:N,1:2])
@@ -80,8 +93,8 @@ type MpcModel
 
         z_lb_6s = ones(mpcParams.N+1,1)*[0.1 -Inf -Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
         z_ub_6s = ones(mpcParams.N+1,1)*[3.5  Inf Inf  Inf  Inf  Inf Inf]                      # upper bounds
-        u_lb_6s = ones(mpcParams.N,1) * [-10.0  -0.3]                                         # lower bounds on steering
-        u_ub_6s = ones(mpcParams.N,1) * [20.0   0.3]                                         # upper bounds
+        u_lb_6s = ones(mpcParams.N,1) * [-1.0  -0.3]                                         # lower bounds on steering
+        u_ub_6s = ones(mpcParams.N,1) * [2.0   0.3]                                         # upper bounds
 
         for i=1:2
             for j=1:N
