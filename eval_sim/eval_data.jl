@@ -1100,19 +1100,19 @@ function create_track(w::Float64=0.4,showplot::Bool=false)
     theta = [0.0]
 
     # MICHAS TRACK
-    add_curve(theta,30,0)
+    add_curve(theta,25,0)
     add_curve(theta,40,-pi/2)
-    add_curve(theta,60,0)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,10,0)
+    add_curve(theta,45,0)
     add_curve(theta,40,-pi/2)
     add_curve(theta,10,0)
+    add_curve(theta,40,-pi/2)
+    add_curve(theta,5,0)
     add_curve(theta,40,+pi/2)
-    add_curve(theta,10,0)
+    add_curve(theta,6,0)
     add_curve(theta,30,-pi/2)
-    add_curve(theta,14,0)
+    add_curve(theta,5,0)
     add_curve(theta,30,-pi/2)
-    add_curve(theta,35,0)
+    add_curve(theta,38,0)
     
 
     @show(length(theta))

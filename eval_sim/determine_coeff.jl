@@ -1,7 +1,7 @@
     
 using JLD, ProfileView
-    code = "d975"
-    log_path_LMPC   = "$(homedir())/simulations/output-LMPC-$(code).jld"
+    code = "59b7"
+    log_path_LMPC   = "$(homedir())/simulations/coefficients_charged/output-LMPC-$(code).jld"
     d_lmpc      = load(log_path_LMPC)
 
     c_Vx        = d_lmpc["c_Vx"]
@@ -9,9 +9,9 @@ using JLD, ProfileView
     c_Psi       = d_lmpc["c_Psi"]
 
 
-    relevant_data_start = findfirst(f->!isnan(f),c_Vx) + 100
+    relevant_data_start = findfirst(f->!isnan(f),c_Vx) +10
    
-
+    last = 700
     c_vx_1_rel = c_Vx[relevant_data_start:end,1]
     c_vx_2_rel = c_Vx[relevant_data_start:end,2]
     c_vx_3_rel = c_Vx[relevant_data_start:end,3]
