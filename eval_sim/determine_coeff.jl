@@ -1,5 +1,6 @@
     
-    code = "b7c4"
+using JLD, ProfileView
+    code = "d975"
     log_path_LMPC   = "$(homedir())/simulations/output-LMPC-$(code).jld"
     d_lmpc      = load(log_path_LMPC)
 

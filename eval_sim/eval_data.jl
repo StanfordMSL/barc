@@ -24,16 +24,14 @@ using JLD, ProfileView
 
 include("../workspace/src/barc/src/barc_lib/classes.jl")
 
-module meas
-    export meas
+
     type Measurements{T}
         i::Int64                # measurement counter
         t::Array{Float64}       # time data (when it was received by this recorder)
         t_msg::Array{Float64}   # time that the message was sent
         z::Array{T}             # measurement values
     end
-end
-using meas
+
 # THIS FUNCTION EVALUATES DATA THAT WAS LOGGED BY THE SIMULATOR (INCLUDES "REAL" SIMULATION DATA)
 # ***********************************************************************************************
 
@@ -1090,7 +1088,7 @@ end
 #     ProfileView.view(li, lidict=lidict)
 # end
 
-function create_track(w::Float64=0.4)
+function create_track(w::Float64=0.4,showplot::Bool=false)
     x = [0.0]           # starting point
     y = [0.0]
     x_l = [0.0]           # starting point
@@ -1101,7 +1099,7 @@ function create_track(w::Float64=0.4)
 
     theta = [0.0]
 
-    #= MICHAS TRACK
+    # MICHAS TRACK
     add_curve(theta,30,0)
     add_curve(theta,40,-pi/2)
     add_curve(theta,60,0)
@@ -1115,9 +1113,9 @@ function create_track(w::Float64=0.4)
     add_curve(theta,14,0)
     add_curve(theta,30,-pi/2)
     add_curve(theta,35,0)
-    =#
+    
 
-
+    @show(length(theta))
     #= SOPHISTICATED TRACK
     add_curve(theta,30,0.0)
     add_curve(theta,60,-2*pi/3)
@@ -1154,17 +1152,17 @@ function create_track(w::Float64=0.4)
      add_curve(theta,35,0)
     =#
     # SIMPLE GOGGLE TRACK
-    add_curve(theta,30,0)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,10,0)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,20,pi/10)
-    add_curve(theta,30,-pi/5)
-    add_curve(theta,20,pi/10)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,10,0)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,35,0)
+    # add_curve(theta,30,0)
+    # add_curve(theta,40,-pi/2)
+    # add_curve(theta,10,0)
+    # add_curve(theta,40,-pi/2)
+    # add_curve(theta,20,pi/10)
+    # add_curve(theta,30,-pi/5)
+    # add_curve(theta,20,pi/10)
+    # add_curve(theta,40,-pi/2)
+    # add_curve(theta,10,0)
+    # add_curve(theta,40,-pi/2)
+    # add_curve(theta,35,0)
     
     #  # SHORT SIMPLE track
     # add_curve(theta,10,0)
@@ -1183,9 +1181,13 @@ function create_track(w::Float64=0.4)
     end
     track = cat(2, x, y, x_l, y_l, x_r, y_r)
     #plot(track[:,1],track[:,2])
-    #return track
-    plot(x,y,x_l,y_l,x_r,y_r)
-    axis("equal")
+
+    if showplot
+        plot(x,y,x_l,y_l,x_r,y_r)
+        axis("equal")
+    end
+    return track
+  
 end
 
 function add_curve(theta::Array{Float64}, length::Int64, angle)

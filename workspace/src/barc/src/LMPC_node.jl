@@ -152,7 +152,7 @@ function main()
     # Specific initializations:
     lapStatus.currentLap    = 1
     lapStatus.currentIt     = 1
-    posInfo.s_target        = 19.11#19.14#17.94#17.76#24.0
+    posInfo.s_target        = 19.11 #23.4 (micha) #19.11#19.14#17.94#17.76#24.0
     k                       = 0                       # overall counter for logging
     
     mpcSol.z = zeros(11,4)
@@ -180,7 +180,7 @@ function main()
 
     uPrev = zeros(10,2)     # saves the last 10 inputs (1 being the most recent one)
 
-    n_pf = 3               # number of first path-following laps (needs to be at least 2)
+    n_pf = 2               # number of first path-following laps (needs to be at least 2)
 
     acc0 = 0.0
     opt_count = 0

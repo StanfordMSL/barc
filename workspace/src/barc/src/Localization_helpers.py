@@ -164,6 +164,7 @@ class Localization(object):
         # theta = add_curve(theta,37,0)
 
         # GOGGLE TRACK WITH STRAIGHT LINES, LENGTH = 19.11m (using ds = 0.03m)
+        
         theta = add_curve(theta,60,0)
         theta = add_curve(theta,80,-pi/2)
         theta = add_curve(theta,20,0)
@@ -175,6 +176,22 @@ class Localization(object):
         theta = add_curve(theta,20,0)
         theta = add_curve(theta,80,-pi/2)
         theta = add_curve(theta,75,0)
+
+        # MICHAEL'S RACETRACK
+        # Always determine length with debug_localization.py
+        #theta =add_curve(theta,60,0)
+        #theta =add_curve(theta,80,-pi/2)
+        #theta =add_curve(theta,120,0)
+        #theta =add_curve(theta,80,-pi/2)
+        #theta =add_curve(theta,20,0)
+        #theta =add_curve(theta,80,-pi/2)
+        #theta =add_curve(theta,20,0)
+        #theta =add_curve(theta,80,+pi/2)
+        #theta =add_curve(theta,20,0)
+        #theta =add_curve(theta,60,-pi/2)
+        #theta =add_curve(theta,28,0)
+        #theta =add_curve(theta,60,-pi/2)
+        #theta =add_curve(theta,70,0)
 
         # SHORT SIMPLE RACETRACK (smooth curves): 12.0m
         # theta = add_curve(theta,10,0)
