@@ -45,18 +45,25 @@ end
 
 function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,trackCoeff::TrackCoeff,modelParams::ModelParams,
                                 posInfo::PosInfo,oldTraj::OldTrajectory,mpcCoeff::MpcCoeff,lapStatus::LapStatus,buffersize::Int64)
-    mpcParams.N                 = 12 #m: changed form 12 FIXME
+    mpcParams.N                 = 12 
     mpcParams.Q                 = [5.0,0.0,0.0,1.0,10.0,0.0]   # Q (only for path following mode)
-    mpcParams.vPathFollowing    = 0.9                           # reference speed for first lap of path following
+    mpcParams.vPathFollowing    = 0.0 #not needed for LMPC       
     mpcParams.Q_term            = 1.0*[20.0,1.0,10.0,20.0,50.0]   # weights for terminal constraints (LMPC, for xDot,yDot,psiDot,ePsi,eY)
     mpcParams.R                 = 0*[10.0,10.0]                 # put weights on a and d_f
     mpcParams.QderivZ           = 1.0*[1,1,1,1,1,0]             # cost matrix for derivative cost of states
-    mpcParams.QderivU           = 1.0*[5.0,100.0]                # cost matrix for derivative cost of inputs
-    mpcParams.Q_term_cost       = 2.0                         # scaling of Q-function
+    mpcParams.QderivU           = 1.0*[5.0,100.0]               # cost matrix for derivative cost of inputs
+    mpcParams.Q_term_cost       = 2.0                           # scaling of Q-function
     mpcParams.delay_df          = 3                             # steering delay
     mpcParams.delay_a           = 1                             # acceleration delay
+    mpcParams.u_lb              = [-1.0, -0.3]                  # a_min, d_F_min 
+    mpcParams.u_ub              = [2.0, 0.3]                    # a_max, d_F_max 
+    mpcParams.z_lb              = [0.1,-Inf,-Inf,-Inf,-Inf,-Inf,-Inf]   # bounds on the states [vx,vy,psidot,epsi,ey,s,acc_filter]
+    mpcParams.z_ub              = [3.5,Inf,Inf,Inf,Inf,Inf, Inf]        # bounds on the states
+    mpcParams.du_lb             = [-Inf, -0.06]                 # bounds for hard constraints on input derivatives
+    mpcParams.du_ub             = [Inf, 0.06] 
 
-    mpcParams_pF.N              = 15 #15
+
+    mpcParams_pF.N              = 15 
     mpcParams_pF.Q              = [0.0,50.0,0.1,10.0]
     mpcParams_pF.R              = 0*[1.0,1.0]               # put weights on a and d_f
     mpcParams_pF.QderivZ        = 0.0*[0,0,0.1,0]           # cost matrix for derivative cost of states
@@ -64,17 +71,33 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcParams_pF.vPathFollowing = 0.9                       # reference speed for first lap of path following
     mpcParams_pF.delay_df       = 3                         # steering delay (number of steps)
     mpcParams_pF.delay_a        = 1                         # acceleration delay
+    mpcParams_pF.u_lb           = [0.0, -0.3]                  # a_min, d_F_min 
+    mpcParams_pF.u_ub           = [1.2, 0.3]                    # a_max, d_F_max 
+    mpcParams_pF.z_lb           = [-Inf,-Inf,-Inf,-Inf]   # bounds on the states [s,ey,epsi,v]
+    mpcParams_pF.z_ub           = [Inf,Inf,Inf,Inf]        # bounds on the states
 
     trackCoeff.nPolyCurvature   = 8                         # 4th order polynomial for curvature approximation
     trackCoeff.coeffCurvature   = zeros(trackCoeff.nPolyCurvature+1)         # polynomial coefficients for curvature approximation (zeros for straight line)
-    trackCoeff.width            = 0.6                       # width of the track (0.5m)
+    trackCoeff.width            = 0.8 #0.6 #IMPORTANT! (seems like a little safety margin is needed) - width of the track (0.5m)
 
     modelParams.l_A             = 0.125
     modelParams.l_B             = 0.125
+    modelParams.width           = 0.2                   # width of the BARC
     modelParams.dt              = 0.1                   # sampling time, also controls the control loop, affects delay_df and Qderiv
     modelParams.m               = 1.98
     modelParams.I_z             = 0.03
     modelParams.c_f             = 0.5                   # friction coefficient: xDot = - c_f*xDot (aerodynamic+tire)
+
+    # bounds on states and on inputs
+
+    #identified parameters based on (68b2 - charged)
+    modelParams.c_Vx            = [-0.012521482551127934,-0.12341315079450611,0.24925430976232502] 
+    modelParams.c_Vy            = [-0.4489520316881863,-0.003816534068778571,0.11170845000402227,-0.16451185081929146]
+    modelParams.c_Psi              = [-0.6796565974307567,-0.2094159184787298, 2.84751043369531]
+    # working at lower battery(?)
+    #modelParams.c_Vx            = [-0.07180500739657202,-0.09745914885807667,0.20428541637830308] 
+    #modelParams.c_Vy            = [-0.5604464371949326,-0.0026778881078367424,0.10449300305620522,-0.16279116816645695]
+    #modelParams.cR              = [-0.4828479437301086,-0.25196103153406685, 2.191800531472544]
 
     posInfo.s_target            = 5.0
 
@@ -92,10 +115,6 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcCoeff.coeffCost          = zeros(mpcCoeff.order+1,2)
     mpcCoeff.coeffConst         = zeros(mpcCoeff.order+1,2,5)
     mpcCoeff.pLength            = 5*2*mpcParams.N        # small values here may lead to numerical problems since the functions are only approximated in a short horizon
-    mpcCoeff.c_Vx               = zeros(3)
-    mpcCoeff.c_Vy               = zeros(4)
-    mpcCoeff.c_Psi              = zeros(3)
-
     lapStatus.currentLap        = 1         # initialize lap number
     lapStatus.currentIt         = 0         # current iteration in lap
 end

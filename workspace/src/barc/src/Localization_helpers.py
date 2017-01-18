@@ -178,7 +178,7 @@ class Localization(object):
         theta = add_curve(theta,75,0)
 
         # MICHAEL'S RACETRACK
-        # Always determine length with debug_localization.py
+        # Always determine length with debug_localization.py and adjust posInfo.s_target in LMPC_node.jl
         # theta =add_curve(theta,50,0)
         # theta =add_curve(theta,80,-pi/2)
         # theta =add_curve(theta,90,0)
@@ -193,21 +193,6 @@ class Localization(object):
         # theta =add_curve(theta,60,-pi/2)
         # theta =add_curve(theta,76,0)
 
-                # MICHAEL'S RACETRACK (backup)
-        # Always determine length with debug_localization.py
-        # theta =add_curve(theta,50,0)
-        # theta =add_curve(theta,80,-pi/2)
-        # theta =add_curve(theta,90,0)
-        # theta =add_curve(theta,80,-pi/2)
-        # theta =add_curve(theta,20,0)
-        # theta =add_curve(theta,80,-pi/2)
-        # theta =add_curve(theta,10,0)
-        # theta =add_curve(theta,80,+pi/2)
-        # theta =add_curve(theta,15,0)
-        # theta =add_curve(theta,60,-pi/2)
-        # theta =add_curve(theta,8,0)
-        # theta =add_curve(theta,60,-pi/2)
-        # theta =add_curve(theta,70,0)
 
         # SHORT SIMPLE RACETRACK (smooth curves): 12.0m
         # theta = add_curve(theta,10,0)
@@ -216,7 +201,6 @@ class Localization(object):
         # theta = add_curve(theta,80,-pi)
         # theta = add_curve(theta,9,0)
 
-        # SIMPLER RACETRACK (half circles as curves):
 
         for i in range(0,size(theta)):
             x = hstack((x, x[-1] + cos(theta[i])*ds))

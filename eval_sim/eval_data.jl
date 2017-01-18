@@ -24,14 +24,16 @@ using JLD, ProfileView
 
 include("../workspace/src/barc/src/barc_lib/classes.jl")
 
-
+module meas
+    export Measurements
     type Measurements{T}
         i::Int64                # measurement counter
         t::Array{Float64}       # time data (when it was received by this recorder)
         t_msg::Array{Float64}   # time that the message was sent
         z::Array{T}             # measurement values
     end
-
+end
+using meas
 # THIS FUNCTION EVALUATES DATA THAT WAS LOGGED BY THE SIMULATOR (INCLUDES "REAL" SIMULATION DATA)
 # ***********************************************************************************************
 
@@ -179,7 +181,7 @@ function eval_run(code::AbstractString)
 
     figure()
     title("v measurements and estimate")
-    plot(vel_est.t-t0,vel_est.z[:,1],"-x",pos_info.t-t0,pos_info.z[:,[8:9,4]],"-+")
+    plot(vel_est.t-t0,vel_est.z[:,1],"-x",pos_info.t-t0,pos_info.z[:,[8:9;4]],"-+")
     legend(["v_raw","est_xDot","est_yDot","est_v"])
     grid()
 
@@ -195,6 +197,66 @@ function eval_run(code::AbstractString)
     # legend(["u","d_f"])
     nothing
 end
+
+# print out the coefficients, parameters that were used for the MPC, models and track to REPL
+function printParameters(code::AbstractString)
+    log_path_LMPC   = "$(homedir())/simulations/output-LMPC-$(code).jld"
+    d_lmpc      = load(log_path_LMPC)
+
+    modelParams = d_lmpc["modelParams"]
+    mpcParams   = d_lmpc["mpcParams"]
+    mpcParams_pF= d_lmpc["mpcParams_pF"]
+    mpcCoeff    = d_lmpc["mpcCoeff"]
+    trackCoeff  = d_lmpc["trackCoeff"]
+    timeInfo  = d_lmpc["timeInfo"]
+
+
+    println("\n ------------------------------------------------ \n Parameters and Coefficients used during Experiment")
+    println(" Code: $(code)")
+    println(" Time: $(Dates.hour(timeInfo)):$(Dates.minute(timeInfo)):$(Dates.second(timeInfo))")
+    println(" Day: $(Dates.yearmonthday(timeInfo))\n ----------------------------------------------- \n")
+
+    println("\nmodelParams.")
+    for n in fieldnames(modelParams)
+        currentField = string(n)
+        val = getfield(modelParams,n)
+        println(currentField *" = $(val)")
+    end
+
+        println("\nmpcParams.")
+    for n in fieldnames(mpcParams)
+        currentField = string(n)
+        val = getfield(mpcParams,n)
+        println(currentField *" = $(val)")
+    end
+
+        println("\nmpcParams_pF.")
+    for n in fieldnames(mpcParams_pF)
+        currentField = string(n)
+        val = getfield(mpcParams_pF,n)
+        println(currentField *" = $(val)")
+    end
+
+        println("\nmpcCoeff.")
+    for n in fieldnames(mpcCoeff)
+        currentField = string(n)
+        val = getfield(mpcCoeff,n)
+        if !(currentField == "coeffConst" || currentField == "coeffCost")
+            println(currentField *" = $(val)")        
+        end
+
+    end
+
+        println("\ntrackCoeff.")
+    for n in fieldnames(trackCoeff)
+        currentField = string(n)
+        val = getfield(trackCoeff,n)
+        println(currentField *" = $(val)")
+    end
+
+end
+
+
 
 function plot_friction_circle(code::AbstractString,lap::Int64)
     log_path_record = "$(homedir())/simulations/output-record-$(code).jld"
@@ -1100,19 +1162,19 @@ function create_track(w::Float64=0.4,showplot::Bool=false)
     theta = [0.0]
 
     # MICHAS TRACK
-    add_curve(theta,25,0)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,45,0)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,10,0)
-    add_curve(theta,40,-pi/2)
-    add_curve(theta,5,0)
-    add_curve(theta,40,+pi/2)
-    add_curve(theta,6,0)
-    add_curve(theta,30,-pi/2)
-    add_curve(theta,5,0)
-    add_curve(theta,30,-pi/2)
-    add_curve(theta,38,0)
+    # add_curve(theta,25,0)
+    # add_curve(theta,40,-pi/2)
+    # add_curve(theta,45,0)
+    # add_curve(theta,40,-pi/2)
+    # add_curve(theta,10,0)
+    # add_curve(theta,40,-pi/2)
+    # add_curve(theta,5,0)
+    # add_curve(theta,40,+pi/2)
+    # add_curve(theta,6,0)
+    # add_curve(theta,30,-pi/2)
+    # add_curve(theta,5,0)
+    # add_curve(theta,30,-pi/2)
+    # add_curve(theta,38,0)
     
 
     @show(length(theta))
@@ -1152,17 +1214,17 @@ function create_track(w::Float64=0.4,showplot::Bool=false)
      add_curve(theta,35,0)
     =#
     # SIMPLE GOGGLE TRACK
-    # add_curve(theta,30,0)
-    # add_curve(theta,40,-pi/2)
-    # add_curve(theta,10,0)
-    # add_curve(theta,40,-pi/2)
-    # add_curve(theta,20,pi/10)
-    # add_curve(theta,30,-pi/5)
-    # add_curve(theta,20,pi/10)
-    # add_curve(theta,40,-pi/2)
-    # add_curve(theta,10,0)
-    # add_curve(theta,40,-pi/2)
-    # add_curve(theta,35,0)
+    add_curve(theta,30,0)
+    add_curve(theta,40,-pi/2)
+    add_curve(theta,10,0)
+    add_curve(theta,40,-pi/2)
+    add_curve(theta,20,pi/10)
+    add_curve(theta,30,-pi/5)
+    add_curve(theta,20,pi/10)
+    add_curve(theta,40,-pi/2)
+    add_curve(theta,10,0)
+    add_curve(theta,40,-pi/2)
+    add_curve(theta,35,0)
     
     #  # SHORT SIMPLE track
     # add_curve(theta,10,0)

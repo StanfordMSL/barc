@@ -20,10 +20,7 @@ type MpcCoeff           # coefficients for trajectory approximation
     pLength::Int64      # small values here may lead to numerical problems since the functions are only approximated in a short horizon
                         # "small" values are about 2*N, good values about 4*N
                         # numerical problems occur at the edges (s=0, when v is almost 0 and s does not change fast and at s=s_target)
-    c_Vx::Array{Float64,1}
-    c_Vy::Array{Float64,1}
-    c_Psi::Array{Float64,1}
-    MpcCoeff(coeffCost=Float64[], coeffConst=Float64[], order=4, pLength=0,c_Vx=Float64[],c_Vy=Float64[],c_Psi=Float64[]) = new(coeffCost, coeffConst, order, pLength, c_Vx, c_Vy, c_Psi)
+    MpcCoeff(coeffCost=Float64[], coeffConst=Float64[], order=4, pLength=0,c_Vx=Float64[],c_Vy=Float64[],c_Psi=Float64[]) = new(coeffCost, coeffConst, order, pLength)
 end
 
 type OldTrajectory      # information about previous trajectories
@@ -52,7 +49,14 @@ type MpcParams          # parameters for MPC solver
     Q_term_cost::Float64
     delay_df::Int64
     delay_a::Int64
-    MpcParams(N=0,nz=0,OrderCostCons=0,Q=Float64[],Q_term=Float64[],R=Float64[],vPathFollowing=1.0,QderivZ=Float64[],QderivU=Float64[],Q_term_cost=1.0,delay_df=0,delay_a=0) = new(N,nz,OrderCostCons,Q,Q_term,R,vPathFollowing,QderivZ,QderivU,Q_term_cost,delay_df,delay_a)
+    u_lb::Array{Float64,1}        # lower bounds for u
+    u_ub::Array{Float64,1}
+    z_lb::Array{Float64,1}
+    z_ub::Array{Float64,1}
+    du_lb::Array{Float64,1}         # bounds for hard constraint on input derivative
+    du_ub::Array{Float64,1}
+
+    MpcParams(N=0,nz=0,OrderCostCons=0,Q=Float64[],Q_term=Float64[],R=Float64[],vPathFollowing=1.0,QderivZ=Float64[],QderivU=Float64[],Q_term_cost=1.0,delay_df=0,delay_a=0,u_lb=Float64[],u_ub=Float64[],z_lb=Float64[],z_ub=Float64[],du_lb=Float64[],du_ub=Float64[]) = new(N,nz,OrderCostCons,Q,Q_term,R,vPathFollowing,QderivZ,QderivU,Q_term_cost,delay_df,delay_a,u_lb,u_ub,z_lb,z_ub,du_lb,du_ub)
 end
 
 type PosInfo            # current position information
@@ -82,14 +86,14 @@ end
 type ModelParams
     l_A::Float64
     l_B::Float64
+    width::Float64
     m::Float64
     I_z::Float64
     dt::Float64
-    u_lb::Array{Float64}        # lower bounds for u
-    u_ub::Array{Float64}        # upper bounds
-    z_lb::Array{Float64}
-    z_ub::Array{Float64}
     c0::Array{Float64}
     c_f::Float64
-    ModelParams(l_A=0.25,l_B=0.25,m=1.98,I_z=0.24,dt=0.1,u_lb=Float64[],u_ub=Float64[],z_lb=Float64[],z_ub=Float64[],c0=Float64[],c_f=0.0) = new(l_A,l_B,m,I_z,dt,u_lb,u_ub,z_lb,z_ub,c0,c_f)
+    c_Vx::Array{Float64}        # identified model coefficients
+    c_Vy::Array{Float64}
+    c_Psi::Array{Float64}
+    ModelParams(l_A=0.0,l_B=0.0,width=0.0,m=0.0,I_z=0.0,dt=0.0,c0=Float64[],c_f=0.0,c_Vx=Float64[],c_Vy=Float64[],c_Psi=Float64[]) = new(l_A,l_B,width,m,I_z,dt,c0,c_f,c_Vx,c_Vy,c_Psi)
 end

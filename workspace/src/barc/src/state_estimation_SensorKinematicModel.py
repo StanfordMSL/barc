@@ -257,9 +257,6 @@ def state_estimation():
         # Calculate new s, ey, epsi (only 12.5 Hz, enough for controller that runs at 10 Hz)
         if est_counter%4 == 0:
             l.find_s()
-        #l.s = 0
-        #l.epsi = 0
-        #l.s_start = 0
 
         # and then publish position info
         ros_t = rospy.get_rostime()

@@ -28,9 +28,6 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
     x_est[:]                  = [msg.x,msg.y,msg.psi,msg.v]
     trackCoeff.coeffCurvature = msg.coeffCurvature
 
-    
-
-
     # check if lap needs to be switched
     if z_est[6] <= lapStatus.s_lapTrigger && lapStatus.switchLap
         oldTraj.idx_end[lapStatus.currentLap] = oldTraj.count[lapStatus.currentLap]
@@ -45,7 +42,6 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
     # save current state in oldTraj
     oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = z_est
     oldTraj.oldInput[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = [msg.u_a,msg.u_df]
-    #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap]-1,:,lapStatus.currentLap])
     oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap],lapStatus.currentLap] = to_sec(msg.header.stamp)
     oldTraj.count[lapStatus.currentLap] += 1
 
@@ -58,7 +54,6 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
 
         oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] = [msg.u_a,msg.u_df]
 
-        #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1]-1,:,lapStatus.currentLap-1])
         oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap-1],lapStatus.currentLap-1] = to_sec(msg.header.stamp)
 
         oldTraj.count[lapStatus.currentLap-1] += 1
@@ -71,7 +66,6 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] = z_est
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],6,lapStatus.currentLap+1] -= posInfo.s_target
         oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] = [msg.u_a,msg.u_df]
-        #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1]-1,:,lapStatus.currentLap+1])
         oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap+1],lapStatus.currentLap+1] = to_sec(msg.header.stamp)
         oldTraj.count[lapStatus.currentLap+1] += 1
         oldTraj.idx_start[lapStatus.currentLap+1] = oldTraj.count[lapStatus.currentLap+1]
@@ -123,9 +117,6 @@ function main()
     log_t                       = zeros(10000,1)
     log_state                   = zeros(10000,7)
     log_cost                    = zeros(10000,6)
-    log_c_Vx                    = zeros(10000,3)
-    log_c_Vy                    = zeros(10000,4)
-    log_c_Psi                   = zeros(10000,3)
     log_cmd                     = zeros(10000,2)
     log_step_diff               = zeros(10000,5)
     log_t_solv                  = zeros(10000)
@@ -152,18 +143,13 @@ function main()
     # Specific initializations:
     lapStatus.currentLap    = 1
     lapStatus.currentIt     = 1
-    posInfo.s_target        = 19.11 #21.27 (micha_better) #19.11#19.14#17.94#17.76#24.0
+    posInfo.s_target        = 19.11 #21.27 (micha_better) 
     k                       = 0                       # overall counter for logging
     
     mpcSol.z = zeros(11,4)
     mpcSol.u = zeros(10,2)
     mpcSol.a_x = 0
     mpcSol.d_f = 0
-
-    #mpcCoeff.c_Psi = [-0.26682109207165566,-0.013445078992161885,1.2389672517023724]
-    #mpcCoeff.c_Psi = [-0.3747957571478858,-0.005013036784512181,5.068342163488241]
-    #mpcCoeff.c_Vy  = [-0.006633028965076818,-0.02997779668710061,0.005781203137095575,0.10642934131787765]
-    #mpcCoeff.c_Vy  = [0.002968102163011754,-0.09886540158694888,0.012234790760745129,1.099308717654053]
     
     # Precompile coeffConstraintCost:
     oldTraj.oldTraj[1:buffersize,6,1] = linspace(0,posInfo.s_target,buffersize)
@@ -183,7 +169,6 @@ function main()
     n_pf = 2               # number of first path-following laps (needs to be at least 2)
 
     acc0 = 0.0
-    opt_count = 0
 
     # Start node
     while ! is_shutdown()
@@ -256,8 +241,7 @@ function main()
                 solveMpcProblem_pathFollow(mdl_pF,mpcSol,mpcParams_pF,trackCoeff,posInfo,modelParams,z_pf,uPrev)
                 acc_f[1] = mpcSol.z[1,5]
                 acc0 = mpcSol.z[2,5]
-            else                        # otherwise: use system-ID-model
-                #mpcCoeff.c_Vx[3] = max(mpcCoeff.c_Vx[3],0.1)
+            else                        # otherwise do LMPC
                 zCurr[i,7] = acc0
                 solveMpcProblem(mdl,mpcSol,mpcCoeff,mpcParams,trackCoeff,lapStatus,posInfo,modelParams,zCurr[i,:]',uPrev)
                 acc0 = mpcSol.z[2,7]
@@ -265,22 +249,9 @@ function main()
             end
             log_t_solv[k+1] = toq()
 
-            # Send command immediately, only if it is optimal!
-            #if mpcSol.solverStatus == :Optimal
-            #    opt_count = 0
-            #else                        # otherwise use the last optimal input
-                #mpcSol.a_x = uPrev[1,1]
-                #mpcSol.d_f = uPrev[1,2]
-                #opt_count += 1
-                if opt_count >= 5
-                    warn("No optimal solution for $opt_count iterations.")
-                end
-            #end
-
             #cmd.header.stamp = get_rostime()
             cmd.motor = convert(Float32,mpcSol.a_x)
             cmd.servo = convert(Float32,mpcSol.d_f)
-            #publish(pub, cmd)
 
             # Write current input information
             uCurr[i,:] = [mpcSol.a_x mpcSol.d_f]
@@ -301,9 +272,6 @@ function main()
             log_cost[k,:]           = mpcSol.cost
             log_curv[k,:]           = trackCoeff.coeffCurvature
             log_state_x[k,:]        = x_est
-            log_c_Vx[k,:]           = mpcCoeff.c_Vx
-            log_c_Vy[k,:]           = mpcCoeff.c_Vy
-            log_c_Psi[k,:]          = mpcCoeff.c_Psi
             if size(mpcSol.z,2) == 5
                 log_sol_z[1:mpcParams_pF.N+1,1:5,k]     = mpcSol.z        # only 4 states during path following mode (first 2 laps)
                 log_sol_u[1:mpcParams_pF.N,:,k]         = mpcSol.u
@@ -328,9 +296,8 @@ function main()
     end
     save(log_path,"oldTraj",oldTraj,"state",log_state[1:k,:],"t",log_t[1:k],"sol_z",log_sol_z[:,:,1:k],"sol_u",log_sol_u[:,:,1:k],
                     "cost",log_cost[1:k,:],"curv",log_curv[1:k,:],"coeffCost",log_coeff_Cost,"coeffConst",log_coeff_Const,
-                    "x_est",log_state_x[1:k,:],"coeffX",log_coeffX[1:k,:],"coeffY",log_coeffY[1:k,:],"c_Vx",log_c_Vx[1:k,:],
-                    "c_Vy",log_c_Vy[1:k,:],"c_Psi",log_c_Psi[1:k,:],"cmd",log_cmd[1:k,:],"step_diff",log_step_diff[1:k,:],
-                    "t_solv",log_t_solv[1:k],"sol_status",log_sol_status[1:k])
+                    "x_est",log_state_x[1:k,:],"coeffX",log_coeffX[1:k,:],"coeffY",log_coeffY[1:k,:],"cmd",log_cmd[1:k,:],"step_diff",log_step_diff[1:k,:],
+                    "t_solv",log_t_solv[1:k],"sol_status",log_sol_status[1:k],"modelParams",modelParams,"mpcParams",mpcParams,"mpcParams_pF",mpcParams_pF,"mpcCoeff",mpcCoeff,"trackCoeff",trackCoeff,"timeInfo",now())
     println("Exiting LMPC node. Saved data to $log_path.")
 
 end

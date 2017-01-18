@@ -3,9 +3,6 @@ type MpcModel
 
     z0::Array{JuMP.NonlinearParameter,1}
     coeff::Array{JuMP.NonlinearParameter,1}
-    c_Vx::Array{JuMP.NonlinearParameter,1}
-    c_Vy::Array{JuMP.NonlinearParameter,1}
-    c_Psi::Array{JuMP.NonlinearParameter,1}
     coeffTermConst::Array{JuMP.NonlinearParameter,3}
     coeffTermCost::Array{JuMP.NonlinearParameter,2}
 
@@ -24,124 +21,74 @@ type MpcModel
 
     function MpcModel(mpcParams::MpcParams,mpcCoeff::MpcCoeff,modelParams::ModelParams,trackCoeff::TrackCoeff)
         m = new()
-        dt   = modelParams.dt
-        L_a  = modelParams.l_A
-        L_b  = modelParams.l_B
-        c0   = modelParams.c0
-        u_lb = modelParams.u_lb
-        u_ub = modelParams.u_ub
-        z_lb = modelParams.z_lb
-        z_ub = modelParams.z_ub
+        dt              = modelParams.dt
+        L_a             = modelParams.l_A
+        L_b             = modelParams.l_B
+        barcWidth       = modelParams.width
+        c0              = modelParams.c0
+        c_Vx            = modelParams.c_Vx::Array{Float64,1}
+        c_Vy            = modelParams.c_Vy::Array{Float64,1}
+        c_Psi            = modelParams.c_Psi::Array{Float64,1}
+
 
         N               = mpcParams.N
         Q               = mpcParams.Q
         Q_term          = mpcParams.Q_term
         R               = mpcParams.R
         order           = mpcCoeff.order       # polynomial order of terminal constraints and cost approximation
-        ey_max          = trackCoeff.width/2
+        ey_max          = trackCoeff.width/2 - barcWidth/2 #take into account the vehicle width
 
         QderivZ         = mpcParams.QderivZ::Array{Float64,1}
         QderivU         = mpcParams.QderivU::Array{Float64,1}
         Q_term_cost     = mpcParams.Q_term_cost::Float64
         delay_df        = mpcParams.delay_df
         delay_a         = mpcParams.delay_a
+        u_lb            = mpcParams.u_lb::Array{Float64,1}
+        u_ub            = mpcParams.u_ub::Array{Float64,1}
+        z_lb            = mpcParams.z_lb::Array{Float64,1}
+        z_ub            = mpcParams.z_ub::Array{Float64,1}
+        du_lb           = mpcParams.du_lb::Array{Float64,1}  #bounds on hard input derivative constraints
+        du_ub           = mpcParams.du_ub::Array{Float64,1}
 
         acc_f           = 1.0
 
-        # identified system parameters
-        # c_Vx1 = -0.07180500739657202
-        # c_Vx2 = -0.09745914885807667
-        # c_Vx3 = 0.20428541637830308
-        # c_Vy1 = -0.5604464371949326
-        # c_Vy2 = -0.0026778881078367424
-        # c_Vy3 = 0.10449300305620522
-        # c_Vy4 = -0.16279116816645695
-        # c_Psi1 = -0.4828479437301086
-        # c_Psi2 = -0.25196103153406685
-        # c_Psi3 = 2.191800531472544
-
-
-
-        # faster coefficients
-
-        # c_Vx1 = 0.01995650235466099
-        # c_Vx2 = -0.1572168025054484
-        # c_Vx3 = 0.2915737506289591
-        # c_Vy1 = -0.779724838675871
-        # c_Vy2 = -0.010641853192254035
-        # c_Vy3 = 0.2531647067988133
-        # c_Vy4 = -0.2207018090849483
-        # c_Psi1 = -1.130943648603171
-        # c_Psi2 = 0.07174867616659654
-        # c_Psi3 = 3.9174565004808173
-
-
-           # identified system parameters (charged - 68b2)
-        c_Vx1 = -0.012521482551127934
-        c_Vx2 = -0.12341315079450611
-        c_Vx3 = 0.24925430976232502
-        c_Vy1 = -0.4489520316881863
-        c_Vy2 = -0.003816534068778571
-        c_Vy3 = 0.11170845000402227
-        c_Vy4 = -0.16451185081929146
-        c_Psi1 = -0.6796565974307567
-        c_Psi2 = -0.2094159184787298
-        c_Psi3 = 2.84751043369531
 
         n_poly_curv = trackCoeff.nPolyCurvature         # polynomial degree of curvature approximation
-        
-        # Path following mode:
-        # Create function-specific parameters
-        v_ref       = mpcParams.vPathFollowing
-        z_Ref::Array{Float64,2}
-        z_Ref       = cat(2,v_ref*ones(N+1,1),zeros(N+1,5))       # Reference trajectory: path following -> stay on line and keep constant velocity
-        u_Ref       = zeros(N,2)
 
-        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.08))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
+        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.08))
 
         @variable( mdl, z_Ol[1:(N+1),1:7])
         @variable( mdl, u_Ol[1:N,1:2])
         @variable( mdl, 0 <= ParInt <= 1)
-        #@variable( mdl, eps[1:2] >= 0) # eps for soft lane constraints
         @variable( mdl, eps[1:N+1] >= 0) # eps for soft lane constraints
-
-        z_lb_6s = ones(mpcParams.N+1,1)*[0.1 -Inf -Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
-        z_ub_6s = ones(mpcParams.N+1,1)*[3.5  Inf Inf  Inf  Inf  Inf Inf]                      # upper bounds
-        u_lb_6s = ones(mpcParams.N,1) * [-1.0  -0.3]                                         # lower bounds on steering
-        u_ub_6s = ones(mpcParams.N,1) * [2.0   0.3]                                         # upper bounds
 
         for i=1:2
             for j=1:N
-                setlowerbound(u_Ol[j,i], u_lb_6s[j,i])
-                setupperbound(u_Ol[j,i], u_ub_6s[j,i])
+                setlowerbound(u_Ol[j,i], u_lb[i])
+                setupperbound(u_Ol[j,i], u_ub[i])
             end
         end
         for i=1:7
             for j=1:N+1
-                setlowerbound(z_Ol[j,i], z_lb_6s[j,i])
-                setupperbound(z_Ol[j,i], z_ub_6s[j,i])
+                setlowerbound(z_Ol[j,i], z_lb[i])
+                setupperbound(z_Ol[j,i], z_ub[i])
             end
         end
 
         @NLparameter(mdl, z0[i=1:7] == 0)
         @NLparameter(mdl, coeff[i=1:n_poly_curv+1] == 0)
-        @NLparameter(mdl, c_Vx[i=1:3]  == 0)
-        @NLparameter(mdl, c_Vy[i=1:4]  == 0)
-        @NLparameter(mdl, c_Psi[i=1:3] == 0)
         @NLparameter(mdl, coeffTermConst[i=1:order+1,j=1:2,k=1:5] == 0)
         @NLparameter(mdl, coeffTermCost[i=1:order+1,j=1:2] == 0)
         @NLparameter(mdl, uPrev[1:10,1:2] == 0)
 
         # Conditions for first solve:
         setvalue(z0[1],1)
-        setvalue(c_Vx[3],0.1)
 
         @NLconstraint(mdl, [i=1:7], z_Ol[1,i] == z0[i])
-        #@NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] <=  ey_max + eps[1])
-        #@NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] >= -ey_max - eps[2])
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] <= ey_max + eps[i])
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,5] >= -ey_max - eps[i])
 
+        # Expressions to formulate the system dynamics
         @NLexpression(mdl, c[i = 1:N], sum{coeff[j]*z_Ol[i,6]^(n_poly_curv-j+1),j=1:n_poly_curv} + coeff[n_poly_curv+1])
         @NLexpression(mdl, dsdt[i = 1:N], (z_Ol[i,1]*cos(z_Ol[i,4]) - z_Ol[i,2]*sin(z_Ol[i,4]))/(1-z_Ol[i,5]*c[i]))
         
@@ -150,40 +97,36 @@ type MpcModel
         # System dynamics
         for i=1:N
             if i<=delay_df
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy1*z_Ol[i,2]/z_Ol[i,1] + c_Vy2*z_Ol[i,1]*z_Ol[i,3] + c_Vy3*z_Ol[i,3]/z_Ol[i,1] + c_Vy4*uPrev[delay_df+1-i,2]) # yDot
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi1*z_Ol[i,3]/z_Ol[i,1] + c_Psi2*z_Ol[i,2]/z_Ol[i,1] + c_Psi3*uPrev[delay_df+1-i,2])                            # psiDot
+                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy[1]*z_Ol[i,2]/z_Ol[i,1] + c_Vy[2]*z_Ol[i,1]*z_Ol[i,3] + c_Vy[3]*z_Ol[i,3]/z_Ol[i,1] + c_Vy[4]*uPrev[delay_df+1-i,2]) # yDot
+                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi[1]*z_Ol[i,3]/z_Ol[i,1] + c_Psi[2]*z_Ol[i,2]/z_Ol[i,1] + c_Psi[3]*uPrev[delay_df+1-i,2])                            # psiDot
             else
-                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy1*z_Ol[i,2]/z_Ol[i,1] + c_Vy2*z_Ol[i,1]*z_Ol[i,3] + c_Vy3*z_Ol[i,3]/z_Ol[i,1] + c_Vy4*u_Ol[i-delay_df,2]) # yDot
-                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi1*z_Ol[i,3]/z_Ol[i,1] + c_Psi2*z_Ol[i,2]/z_Ol[i,1] + c_Psi3*u_Ol[i-delay_df,2])                            # psiDot
+                @NLconstraint(mdl, z_Ol[i+1,2]  == z_Ol[i,2] + c_Vy[1]*z_Ol[i,2]/z_Ol[i,1] + c_Vy[2]*z_Ol[i,1]*z_Ol[i,3] + c_Vy[3]*z_Ol[i,3]/z_Ol[i,1] + c_Vy[4]*u_Ol[i-delay_df,2]) # yDot
+                @NLconstraint(mdl, z_Ol[i+1,3]  == z_Ol[i,3] + c_Psi[1]*z_Ol[i,3]/z_Ol[i,1] + c_Psi[2]*z_Ol[i,2]/z_Ol[i,1] + c_Psi[3]*u_Ol[i-delay_df,2])                            # psiDot
             end
             if i<=delay_a
-                #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(uPrev[delay_a+1-i,1] - 0.5*z_Ol[i,1]))
-                #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*u_Ol[i,1])                              # xDot
                 @NLconstraint(mdl, z_Ol[i+1,7]  == z_Ol[i,7] + dt*(uPrev[delay_a+1-i,1]-z_Ol[i,7])*acc_f)
             else
-                #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*u_Ol[i,1])                              # xDot
                 @NLconstraint(mdl, z_Ol[i+1,7]  == z_Ol[i,7] + dt*(u_Ol[i-delay_a,1]-z_Ol[i,7])*acc_f)
             end
-            #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2] + c_Vx[2]*z_Ol[i,3] + c_Vx[3]*z_Ol[i,1] + c_Vx[4]*z_Ol[i,7])                               # xDot
-            #@NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + dt*(z_Ol[i,7] - 0.5*z_Ol[i,1]))                               # xDot
-            @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx1*z_Ol[i,2]*z_Ol[i,3] + c_Vx2*z_Ol[i,1] + c_Vx3*z_Ol[i,7]) 
+
+            @NLconstraint(mdl, z_Ol[i+1,1]  == z_Ol[i,1] + c_Vx[1]*z_Ol[i,2]*z_Ol[i,3] + c_Vx[2]*z_Ol[i,1] + c_Vx[3]*z_Ol[i,7]) 
             @NLconstraint(mdl, z_Ol[i+1,4]  == z_Ol[i,4] + dt*(z_Ol[i,3]-dsdt[i]*c[i]))                                                                                 # ePsi
             @NLconstraint(mdl, z_Ol[i+1,5]  == z_Ol[i,5] + dt*(z_Ol[i,1]*sin(z_Ol[i,4])+z_Ol[i,2]*cos(z_Ol[i,4])))                                                      # eY
             @NLconstraint(mdl, z_Ol[i+1,6]  == z_Ol[i,6] + dt*dsdt[i]  )                                                                                                # s
         end
-        # @NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] <= 0.05)
-        # @NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] >= -0.2)
-        # for i=1:N-1 # Constraints on u:
-        #     @NLconstraint(mdl, u_Ol[i+1,1]-u_Ol[i,1] <= 0.05)
-        #     @NLconstraint(mdl, u_Ol[i+1,1]-u_Ol[i,1] >= -0.2)
-        # end
 
-        @NLconstraint(mdl, u_Ol[1,2]-uPrev[1,2] <= 0.06)
-        @NLconstraint(mdl, u_Ol[1,2]-uPrev[1,2] >= -0.06)
-        for i=1:N-1 # Constraints on u:
-            @NLconstraint(mdl, u_Ol[i+1,2]-u_Ol[i,2] <= 0.06)
-            @NLconstraint(mdl, u_Ol[i+1,2]-u_Ol[i,2] >= -0.06)
-        end
+        # Hard input derivative constraints
+        @NLconstraint(mdl, u_Ol[1,2]-uPrev[1,2] <= du_ub[2])
+        @NLconstraint(mdl, u_Ol[1,2]-uPrev[1,2] >= du_lb[2])
+
+        #@NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] <= du_ub[1])
+        #@NLconstraint(mdl, u_Ol[1,1]-uPrev[1,1] >= du_lb[1])
+        #for j=1:2
+            for i=1:N-1 # Constraints on u:
+                @NLconstraint(mdl, u_Ol[i+1,2]-u_Ol[i,2] <= du_ub[2])
+                @NLconstraint(mdl, u_Ol[i+1,2]-u_Ol[i,2] >= du_lb[2])
+            end
+        #end
 
         # Cost functions
 
@@ -218,10 +161,6 @@ type MpcModel
         @NLexpression(mdl, costZTerm, 1/5*(Q_term_cost*(ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,6]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
                                       (1-ParInt)*(sum{coeffTermCost[i,2]*z_Ol[N+1,6]^(order+1-i),i=1:order}+coeffTermCost[order+1,2]))))
         
-        # State cost (only for path following mode)
-        # ---------------------------------
-        #@NLexpression(mdl, costZ, 0.5*sum{Q[i]*sum{(z_Ol[j,i]-z_Ref[j,i])^2,j=1:N+1},i=1:6})    # Follow trajectory
-        #@NLexpression(mdl, costZ, 0.5*sum{(Q[1]*(sqrt(z_Ol[j,1]^2+z_Ol[j,2]^2)-1.0)^2 + Q[4]*z_Ol[j,4]^2 + Q[5]*z_Ol[j,5]^2),j=2:N+1})
 
         @NLexpression(mdl, costZ, 0*QderivU[1]*sum{z_Ol[i,7],i=1:N})
         # Solve model once
@@ -236,9 +175,6 @@ type MpcModel
         m.coeff = coeff
         m.z_Ol = z_Ol
         m.u_Ol = u_Ol
-        m.c_Vx = c_Vx
-        m.c_Vy = c_Vy
-        m.c_Psi = c_Psi
         m.ParInt = ParInt
         m.uPrev = uPrev
 
@@ -277,10 +213,7 @@ type MpcModel_pF
         L_a         = modelParams.l_A
         L_b         = modelParams.l_B
         c0          = modelParams.c0
-        u_lb        = modelParams.u_lb
-        u_ub        = modelParams.u_ub
-        z_lb        = modelParams.z_lb
-        z_ub        = modelParams.z_ub
+  
 
         N           = mpcParams.N
         Q           = mpcParams.Q
@@ -289,6 +222,10 @@ type MpcModel_pF
         QderivU     = mpcParams.QderivU::Array{Float64,1}
         delay_df    = mpcParams.delay_df::Int64
         delay_a     = mpcParams.delay_a::Int64
+        u_lb        = mpcParams.u_lb::Array{Float64,1}
+        u_ub        = mpcParams.u_ub::Array{Float64,1}
+        z_lb        = mpcParams.z_lb::Array{Float64,1}
+        z_ub        = mpcParams.z_ub::Array{Float64,1}
 
         v_ref       = mpcParams.vPathFollowing
 
@@ -302,30 +239,24 @@ type MpcModel_pF
         u_Ref       = zeros(N,2)
 
         # Create Model
-        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.07))#,linear_solver="ma57",print_user_options="yes"))
+        mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.07))
 
         # Create variables (these are going to be optimized)
         @variable( mdl, z_Ol[1:(N+1),1:5], start = 0)          # z = s, ey, epsi, v
         @variable( mdl, u_Ol[1:N,1:2], start = 0)
 
-        # Set bounds
-        z_lb_4s = ones(mpcParams.N+1,1)*[-Inf -Inf -Inf -0.5]                  # lower bounds on states
-        z_ub_4s = ones(mpcParams.N+1,1)*[ Inf  Inf  Inf  1.5]                  # upper bounds
-        u_lb_4s = ones(mpcParams.N,1) * [0.0  -0.3]                            # lower bounds on steering
-        u_ub_4s = ones(mpcParams.N,1) * [1.2   0.3]                            # upper bounds
-
         for i=1:2
             for j=1:N
-                setlowerbound(u_Ol[j,i], u_lb_4s[j,i])
-                setupperbound(u_Ol[j,i], u_ub_4s[j,i])
+                setlowerbound(u_Ol[j,i], u_lb[i])
+                setupperbound(u_Ol[j,i], u_ub[i])
             end
         end
-        # for i=1:4
-        #     for j=1:N+1
-        #         setlowerbound(z_Ol[j,i], z_lb_4s[j,i])
-        #         setupperbound(z_Ol[j,i], z_ub_4s[j,i])
-        #     end
-        # end
+        for i=1:4
+            for j=1:N+1
+                setlowerbound(z_Ol[j,i], z_lb[i])
+                setupperbound(z_Ol[j,i], z_ub[i])
+            end
+        end
 
         @NLparameter(mdl, z0[i=1:5] == 0)
         @NLparameter(mdl, uPrev[1:10,1:2] == 0)
