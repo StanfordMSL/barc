@@ -31,7 +31,6 @@ function coeffConstraintCost(oldTraj::OldTrajectory, mpcCoeff::MpcCoeff, posInfo
     Order           = mpcCoeff.order                # interpolation order for cost and constraints
     pLength         = mpcCoeff.pLength              # interpolation length for polynomials
     delay_df        = mpcParams.delay_df
-    #delay           = 2
 
     #coeffCost       = zeros(Order+1,2)              # polynomial coefficients for cost
     #coeffConst      = zeros(Order+1,2,5)            # nz-1 beacuse no coeff for s
@@ -48,15 +47,12 @@ function coeffConstraintCost(oldTraj::OldTrajectory, mpcCoeff::MpcCoeff, posInfo
     # Select the old data
     oldxDot         = oldTraj.oldTraj[:,1,selected_laps]::Array{Float64,3}
     oldyDot         = oldTraj.oldTraj[:,2,selected_laps]::Array{Float64,3}
-    #oldpsiDot       = oldTraj.oldTraj[:,3,selected_laps]::Array{Float64,3}
     oldePsi         = oldTraj.oldTraj[:,4,selected_laps]::Array{Float64,3}
     oldeY           = oldTraj.oldTraj[:,5,selected_laps]::Array{Float64,3}
     oldS            = oldTraj.oldTraj[:,6,selected_laps]::Array{Float64,3}
+    oldRho          = oldTraj.oldTraj[:,8,selected_laps]::Array{Float64,3} 
     oldV            = sqrt(oldxDot.^2 + oldyDot.^2 )
-    #oldacc          = oldTraj.oldTraj[:,7,selected_laps]::Array{Float64,3}
-    #olda            = oldTraj.oldInput[:,1,selected_laps]::Array{Float64,3}
-    #olddF           = oldTraj.oldInput[:,2,selected_laps]::Array{Float64,3}
-    ##olddF           = smooth(olddF,5)
+
 
     N_points        = size(oldTraj.oldTraj,1)     # second dimension = length (=buffersize)
 
@@ -112,6 +108,7 @@ function coeffConstraintCost(oldTraj::OldTrajectory, mpcCoeff::MpcCoeff, posInfo
         mpcCoeff.coeffConst[:,i,1]    = MatrixInterp[:,:,i]\oldeY[vec_range[i]]
         mpcCoeff.coeffConst[:,i,2]    = MatrixInterp[:,:,i]\oldePsi[vec_range[i]]
         mpcCoeff.coeffConst[:,i,3]    = MatrixInterp[:,:,i]\oldV[vec_range[i]]
+        mpcCoeff.coeffConst[:,i,4]    = MatrixInterp[:,:,i]\oldRho[vec_range[i]]
     end
 
     # Finished with calculating the constraint coefficients

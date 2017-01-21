@@ -22,9 +22,9 @@ include("barc_lib/simModel.jl")
 
 # This function is called whenever a new state estimate is received.
 # It saves this estimate in oldTraj and uses it in the MPC formulation (see in main)
-function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,posInfo::PosInfo,mpcSol::MpcSol,oldTraj::OldTrajectory,trackCoeff::TrackCoeff,z_est::Array{Float64,1},x_est::Array{Float64,1})         # update current position and track data
+function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,posInfo::PosInfo,mpcSol::MpcSol,oldTraj::OldTrajectory,trackCoeff::TrackCoeff,z_est::Array{Float64,1},x_est::Array{Float64,1},rhoEst::Float64)         # update current position and track data
     # update mpc initial condition
-    z_est[:]                  = [msg.v_x,msg.v_y,msg.psiDot,msg.epsi,msg.ey,msg.s,acc_f[1]]             # use z_est as pointer
+    z_est[:]                  = [msg.v_x,msg.v_y,msg.psiDot,msg.epsi,msg.ey,msg.s,acc_f[1],rhoEst]             # use z_est as pointer
     x_est[:]                  = [msg.x,msg.y,msg.psi,msg.v]
     trackCoeff.coeffCurvature = msg.coeffCurvature
 
@@ -42,7 +42,6 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
     # save current state in oldTraj
     oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = z_est
     oldTraj.oldInput[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = [msg.u_a,msg.u_df]
-    #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap]-1,:,lapStatus.currentLap])
     oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap],lapStatus.currentLap] = to_sec(msg.header.stamp)
     oldTraj.count[lapStatus.currentLap] += 1
 
@@ -51,7 +50,6 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] = z_est
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap-1],6,lapStatus.currentLap-1] += posInfo.s_target
         oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] = [msg.u_a,msg.u_df]
-        #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1],:,lapStatus.currentLap-1] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap-1]-1,:,lapStatus.currentLap-1])
         oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap-1],lapStatus.currentLap-1] = to_sec(msg.header.stamp)
         oldTraj.count[lapStatus.currentLap-1] += 1
     end
@@ -61,7 +59,6 @@ function SE_callback(msg::pos_info,acc_f::Array{Float64},lapStatus::LapStatus,po
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] = z_est
         oldTraj.oldTraj[oldTraj.count[lapStatus.currentLap+1],6,lapStatus.currentLap+1] -= posInfo.s_target
         oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] = [msg.u_a,msg.u_df]
-        #oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1],:,lapStatus.currentLap+1] += 0.5*([msg.u_a msg.u_df]-oldTraj.oldInput[oldTraj.count[lapStatus.currentLap+1]-1,:,lapStatus.currentLap+1])
         oldTraj.oldTimes[oldTraj.count[lapStatus.currentLap+1],lapStatus.currentLap+1] = to_sec(msg.header.stamp)
         oldTraj.count[lapStatus.currentLap+1] += 1
         oldTraj.idx_start[lapStatus.currentLap+1] = oldTraj.count[lapStatus.currentLap+1]
@@ -95,7 +92,7 @@ function main()
 
     max_N = max(mpcParams.N,mpcParams_pF.N)
     # ROS-specific variables
-    z_est                       = zeros(7)          # this is a buffer that saves current state information (xDot, yDot, psiDot, ePsi, eY, s)
+    z_est                       = zeros(8)          # this is a buffer that saves current state information (xDot, yDot, psiDot, ePsi, eY, s)
     x_est                       = zeros(4)          # this is a buffer that saves further state information (x, y, psi, v)
     coeffX                      = zeros(9)          # buffer for coeffX (only logging)
     coeffY                      = zeros(9)          # buffer for coeffY (only logging)
@@ -104,7 +101,7 @@ function main()
 
     # Logging variables
     log_coeff_Cost              = NaN*ones(mpcCoeff.order+1,2,10000)
-    log_coeff_Const             = NaN*ones(mpcCoeff.order+1,2,3,10000)
+    log_coeff_Const             = NaN*ones(mpcCoeff.order+1,2,4,10000)
     log_sol_z                   = NaN*ones(max_N+1,5,10000)
     log_sol_u                   = NaN*ones(max_N,2,10000)
     log_curv                    = zeros(10000,trackCoeff.nPolyCurvature+1)
@@ -112,32 +109,31 @@ function main()
     log_coeffX                  = zeros(10000,9)
     log_coeffY                  = zeros(10000,9)
     log_t                       = zeros(10000,1)
-    log_state                   = zeros(10000,7)
-    log_cost                    = zeros(10000,6)
-    log_c_Vx                    = zeros(10000,3)
-    log_c_Vy                    = zeros(10000,4)
-    log_c_Psi                   = zeros(10000,3)
-    log_cmd                     = zeros(10000,2)
+    log_state                   = zeros(10000,8)
+    log_cost                    = zeros(10000,7)
+    log_cmd                     = zeros(10000,3)
     log_step_diff               = zeros(10000,5)
     log_t_solv                  = zeros(10000)
     log_sol_status              = Array(Symbol,10000)
     
-    acc_f = [0.0]
+    acc_f                       = [0.0]
+    rhoRef                      = 1/modelParams.l_A
+    rhoEst                      = rhoRef                # for pathfollowing, will be later overwriten in mpc laps
 
     # Initialize ROS node and topics
     init_node("mpc_traj")
     loop_rate = Rate(1/modelParams.dt)
     pub = Publisher("ecu", ECU, queue_size=1)::RobotOS.Publisher{barc.msg.ECU}
     # The subscriber passes arguments (coeffCurvature and z_est) which are updated by the callback function:
-    s1 = Subscriber("pos_info", pos_info, SE_callback, (acc_f,lapStatus,posInfo,mpcSol,oldTraj,trackCoeff,z_est,x_est),queue_size=50)::RobotOS.Subscriber{barc.msg.pos_info}
+    s1 = Subscriber("pos_info", pos_info, SE_callback, (acc_f,lapStatus,posInfo,mpcSol,oldTraj,trackCoeff,z_est,x_est,rhoEst),queue_size=50)::RobotOS.Subscriber{barc.msg.pos_info}
     # Note: Choose queue size long enough so that no pos_info packets get lost! They are important for system ID!
 
     run_id = get_param("run_id")
     println("Finished initialization.")
     
     # buffer in current lap
-    zCurr                       = zeros(10000,7)    # contains state information in current lap (max. 10'000 steps)
-    uCurr                       = zeros(10000,2)    # contains input information
+    zCurr                       = zeros(10000,8)    # contains state information in current lap (max. 10'000 steps)
+    uCurr                       = zeros(10000,3)    # contains input information
     step_diff                   = zeros(5)
 
     # Specific initializations:
@@ -150,11 +146,6 @@ function main()
     mpcSol.u = zeros(10,2)
     mpcSol.a_x = 0
     mpcSol.d_f = 0
-
-    #mpcCoeff.c_Psi = [-0.26682109207165566,-0.013445078992161885,1.2389672517023724]
-    #mpcCoeff.c_Psi = [-0.3747957571478858,-0.005013036784512181,5.068342163488241]
-    #mpcCoeff.c_Vy  = [-0.006633028965076818,-0.02997779668710061,0.005781203137095575,0.10642934131787765]
-    #mpcCoeff.c_Vy  = [0.002968102163011754,-0.09886540158694888,0.012234790760745129,1.099308717654053]
     
     # Precompile coeffConstraintCost:
     oldTraj.oldTraj[1:buffersize,6,1] = linspace(0,posInfo.s_target,buffersize)
@@ -219,7 +210,7 @@ function main()
                     setvalue(mdl.z_Ol[:,1],mpcSol.z[1:mpcParams.N+1,1]-posInfo.s_target)
                     setvalue(mdl.z_Ol[:,3],mpcSol.z[1:mpcParams.N+1,3])
                     setvalue(mdl.z_Ol[:,4],mpcSol.z[1:mpcParams.N+1,4])
-                    setvalue(mdl.u_Ol,mpcSol.u[1:mpcParams.N,:])
+                    #m: setvalue(mdl.u_Ol,mpcSol.u[1:mpcParams.N,:])
                 elseif lapStatus.currentLap > n_pf+1
                     setvalue(mdl.z_Ol[:,1],mpcSol.z[:,1]-posInfo.s_target)
                 end
@@ -247,38 +238,26 @@ function main()
                 solveMpcProblem_pathFollow(mdl_pF,mpcSol,mpcParams_pF,trackCoeff,posInfo,modelParams,z_pf,uPrev)
                 acc_f[1] = mpcSol.z[1,5]
                 acc0 = mpcSol.z[2,5]
-            else                        # otherwise: use system-ID-model
+            else                        # otherwise: use adaptive kinematic model
                 zCurr[i,7] = acc0
-                zLMPC = [zCurr[i,6],zCurr[i,5],zCurr[i,4],norm(zCurr[i,1:2]),acc0]    
+                zLMPC = [zCurr[i,6],zCurr[i,5],zCurr[i,4],norm(zCurr[i,1:2]),rhoEst,acc0]    
                 solveMpcProblem(mdl,mpcSol,mpcCoeff,mpcParams,trackCoeff,lapStatus,posInfo,modelParams,zLMPC,uPrev)
-                acc0 = mpcSol.z[2,5]
-                acc_f[1] = mpcSol.z[1,5]
+                rhoEst = mpcSol.z[2,5]
+                acc0 = mpcSol.z[2,7]
+                acc_f[1] = mpcSol.z[1,7]
             end
             log_t_solv[k+1] = toq()
 
-            # Send command immediately, only if it is optimal!
-            #if mpcSol.solverStatus == :Optimal
-            #    opt_count = 0
-            #else                        # otherwise use the last optimal input
-                #mpcSol.a_x = uPrev[1,1]
-                #mpcSol.d_f = uPrev[1,2]
-                #opt_count += 1
-                if opt_count >= 5
-                    warn("No optimal solution for $opt_count iterations.")
-                end
-            #end
-
-            #cmd.header.stamp = get_rostime()
+   
             cmd.motor = convert(Float32,mpcSol.a_x)
             cmd.servo = convert(Float32,mpcSol.d_f)    
-            #publish(pub, cmd)
 
             # Write current input information
-            uCurr[i,:] = [mpcSol.a_x mpcSol.d_f]
+            uCurr[i,:] = [mpcSol.a_x mpcSol.d_f mpcSol.phi]
             zCurr[i,6] = posInfo.s%posInfo.s_target   # save absolute position in s (for oldTrajectory)
 
             uPrev = circshift(uPrev,1) #m: shift data by one up
-            uPrev[1,:] = uCurr[i,:] #m: change the first entry 
+            uPrev[1,:] = uCurr[i,1:2] #m: change the first entry 
             #println("Finished solving, status: $(mpcSol.solverStatus), u = $(uCurr[i,:]), t = $(log_t_solv[k+1]) s")
 
             # Logging
@@ -292,20 +271,7 @@ function main()
             log_cost[k,:]           = mpcSol.cost
             log_curv[k,:]           = trackCoeff.coeffCurvature
             log_state_x[k,:]        = x_est
-            #log_c_Vx[k,:]           = mpcCoeff.c_Vx
-            #log_c_Vy[k,:]           = mpcCoeff.c_Vy
-            #log_c_Psi[k,:]          = mpcCoeff.c_Psi
 
-            #m: Taken away, at back later (assinment error)
-            #=
-            if size(mpcSol.z,2) == 5
-                log_sol_z[1:mpcParams_pF.N+1,1:5,k]     = mpcSol.z        # only 4 states during path following mode (first 2 laps)
-                log_sol_u[1:mpcParams_pF.N,:,k]         = mpcSol.u
-            else
-                log_sol_z[1:mpcParams.N+1,1:5,k]        = mpcSol.z #m
-                log_sol_u[1:mpcParams.N,:,k]            = mpcSol.u
-            end
-            =#
             # Count one up:
             lapStatus.currentIt += 1
         else
@@ -322,8 +288,7 @@ function main()
     end
     save(log_path,"oldTraj",oldTraj,"state",log_state[1:k,:],"t",log_t[1:k],"sol_z",log_sol_z[:,:,1:k],"sol_u",log_sol_u[:,:,1:k],
                     "cost",log_cost[1:k,:],"curv",log_curv[1:k,:],"coeffCost",log_coeff_Cost,"coeffConst",log_coeff_Const,
-                    "x_est",log_state_x[1:k,:],"coeffX",log_coeffX[1:k,:],"coeffY",log_coeffY[1:k,:],"c_Vx",log_c_Vx[1:k,:],
-                    "c_Vy",log_c_Vy[1:k,:],"c_Psi",log_c_Psi[1:k,:],"cmd",log_cmd[1:k,:],"step_diff",log_step_diff[1:k,:],
+                    "x_est",log_state_x[1:k,:],"coeffX",log_coeffX[1:k,:],"coeffY",log_coeffY[1:k,:],"cmd",log_cmd[1:k,:],"step_diff",log_step_diff[1:k,:],
                     "t_solv",log_t_solv[1:k],"sol_status",log_sol_status[1:k])
     println("Exiting LMPC node. Saved data to $log_path.")
 
