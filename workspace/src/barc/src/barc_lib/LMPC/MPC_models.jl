@@ -44,6 +44,7 @@ type MpcModel
 
         QderivZ         = mpcParams.QderivZ::Array{Float64,1}
         QderivU         = mpcParams.QderivU::Array{Float64,1}
+        Q_modelError    = mpcParams.Q_modelError::Float64
         Q_term_cost     = mpcParams.Q_term_cost::Float64
         delay_df        = mpcParams.delay_df
         delay_a         = mpcParams.delay_a
@@ -163,15 +164,15 @@ type MpcModel
         # Terminal cost
         # ---------------------------------
         # The value of this cost determines how fast the algorithm learns. The higher this cost, the faster the control tries to reach the finish line.
-        @NLexpression(mdl, costZTerm, 1/5*(Q_term_cost*(ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
-                                      (1-ParInt)*(sum{coeffTermCost[i,2]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,2]))))
+        @NLexpression(mdl, costZTerm, (ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
+                                      (1-ParInt)*(sum{coeffTermCost[i,2]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,2])))
 
         # Model error cost (deviation in steering error e_ψ from reference model)
         # ---------------------------------
-        @NLexpression(mdl, modelErrorCost, sum{(z_Ol[j,6]-z_Ol[j,3])^2,j=1:N+1})
+        @NLexpression(mdl, modelErrorCost, Q_modelError*sum{(z_Ol[j,6]-z_Ol[j,3])^2,j=1:N+1})
 
         # Solve model once
-        @NLobjective(mdl, Min, derivCost + constZTerm + costZTerm + laneCost + N*Q_term_cost + modelErrorCost)
+        @NLobjective(mdl, Min, derivCost + constZTerm + costZTerm + laneCost + Q_term_cost + modelErrorCost)
         sol_stat=solve(mdl)
         println("Finished solve 1: $sol_stat")
         sol_stat=solve(mdl)

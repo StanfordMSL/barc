@@ -44,7 +44,7 @@ function saveOldTraj(oldTraj::OldTrajectory,zCurr::Array{Float64},uCurr::Array{F
 end
 
 function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,trackCoeff::TrackCoeff,modelParams::ModelParams,
-                                posInfo::PosInfo,oldTraj::OldTrajectory,mpcCoeff::MpcCoeff,lapStatus::LapStatus,buffersize::Int64)
+                                posInfo::PosInfo,oldTraj::OldTrajectory,mpcTraj::MpcTrajectory,mpcCoeff::MpcCoeff,lapStatus::LapStatus,buffersize::Int64)
     mpcParams.N                 = 12
     mpcParams.Q                 = [5.0,0.0,0.0,1.0,10.0,0.0]   # Q (only for path following mode)
     mpcParams.vPathFollowing    = 0.9                           # reference speed for first lap of path following
@@ -52,7 +52,9 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcParams.R                 = 0.0*[10.0,10.0]                 # put weights on a and d_f
     mpcParams.QderivZ           = 1.0*[0,1,1,1] #m            # cost matrix for derivative cost of states
     mpcParams.QderivU           = 1.0*[5.0,100.0]                # cost matrix for derivative cost of inputs
-    mpcParams.Q_term_cost       = 5.0                         # scaling of Q-function
+    mpcParams.Q_term_cost       = 3.0                         # scaling of Q-function
+    mpcParams.Q_modelError      = 1.0                         # scaling of error between reference parameter and chosen parameter
+
     mpcParams.delay_df          = 3                             # steering delay
     mpcParams.delay_a           = 1                             # acceleration delay
 
@@ -69,8 +71,8 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     trackCoeff.coeffCurvature   = zeros(trackCoeff.nPolyCurvature+1)         # polynomial coefficients for curvature approximation (zeros for straight line)
     trackCoeff.width            = 0.6                       # width of the track (0.5m)
 
-    modelParams.l_A             = 0.125
-    modelParams.l_B             = 0.125
+    modelParams.l_A             = 0.125 #l.A is used to calculate rhoRef
+    modelParams.l_B             = 0.125 
     modelParams.dt              = 0.1                   # sampling time, also controls the control loop, affects delay_df and Qderiv
     modelParams.m               = 1.98
     modelParams.I_z             = 0.03
@@ -78,7 +80,7 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
 
     posInfo.s_target            = 5.0
 
-    oldTraj.oldTraj             = NaN*ones(buffersize,8,30)
+    oldTraj.oldTraj             = NaN*ones(buffersize,7,30)
     oldTraj.oldInput            = zeros(buffersize,2,30)
     oldTraj.oldTimes            = NaN*ones(buffersize,30)
     oldTraj.count               = ones(30)*2
@@ -87,6 +89,13 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     oldTraj.postbuf             = 30
     oldTraj.idx_start           = zeros(30)
     oldTraj.idx_end             = zeros(30)
+
+    mpcTraj.closedLoopSEY       = zeros(buffersize,7,30)
+    mpcTraj.inputHistory        = zeros(buffersize,3,30)
+    mpcTraj.cost                = zeros(buffersize,30)
+    mpcTraj.idx_end             = zeros(30) # all data points until between 0 <= s <= lapLength
+    mpcTraj.count               = ones(30) #total number of saved data points for each lap
+
 
     mpcCoeff.order              = 5
     mpcCoeff.coeffCost          = zeros(mpcCoeff.order+1,2)
