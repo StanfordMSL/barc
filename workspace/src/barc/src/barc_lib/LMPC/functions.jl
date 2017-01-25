@@ -100,7 +100,7 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcCoeff.order              = 5
     mpcCoeff.coeffCost          = zeros(mpcCoeff.order+1,2)
     mpcCoeff.coeffConst         = zeros(mpcCoeff.order+1,2,4)
-    mpcCoeff.pLength            = 5*2*mpcParams.N        # small values here may lead to numerical problems since the functions are only approximated in a short horizon
+    mpcCoeff.pLength            = 2*mpcParams.N        # TODO: Check if this is enough and also polynomial order
 
 
     lapStatus.currentLap        = 1         # initialize lap number

@@ -91,6 +91,7 @@ function solveMpcProblem_pathFollow(mdl::MpcModel_pF,mpcSol::MpcSol,mpcParams::M
 
     mpcSol.a_x = sol_u[1,1]
     mpcSol.d_f = sol_u[1,2]
+    mpcSol.phi = 0.0
     mpcSol.u   = sol_u
     mpcSol.z   = sol_z
     mpcSol.solverStatus = sol_status

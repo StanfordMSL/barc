@@ -1,4 +1,4 @@
-#!/usr/bin/env julia4
+#!/usr/bin/env julia
 
 #=
 This node listens to and records messages of following topics:

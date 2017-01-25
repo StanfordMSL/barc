@@ -1,4 +1,4 @@
-#!/usr/bin/env julia4
+#!/usr/bin/env julia
 
 #=
  Licensing Information: You are free to use or extend these projects for 

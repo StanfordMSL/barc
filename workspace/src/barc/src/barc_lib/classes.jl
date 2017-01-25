@@ -44,7 +44,7 @@ type MpcTrajectory
     cost::Array{Float64}
     idx_end::Array{Int64}
     count::Array{Int64}
-    MpcTrajectory(closedLoopSEY=Float64[],inputHistory=Float[],cost=Float64[],idx_end=Int64[],count=Int64[]) = new(closedLoopSEY,inputHistory,cost,idx_end,count)
+    MpcTrajectory(closedLoopSEY=Float64[],inputHistory=Float64[],cost=Float64[],idx_end=Int64[],count=Int64[]) = new(closedLoopSEY,inputHistory,cost,idx_end,count)
 end
 type MpcParams          # parameters for MPC solver
     N::Int64

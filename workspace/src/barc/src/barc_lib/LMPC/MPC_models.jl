@@ -80,7 +80,7 @@ type MpcModel
             end
         end
 
-        @NLparameter(mdl, z0[i=1:6] == 0)
+        @NLparameter(mdl, z0[i=1:7] == 0)
         @NLparameter(mdl, coeff[i=1:n_poly_curv+1] == 0)
         @NLparameter(mdl, coeffTermConst[i=1:order+1,j=1:2,k=1:4] == 0)
         @NLparameter(mdl, coeffTermCost[i=1:order+1,j=1:2] == 0)
@@ -91,7 +91,7 @@ type MpcModel
 
         @NLconstraint(mdl, [i=1:5], z_Ol[1,i] == z0[i])
         @NLconstraint(mdl,          z_Ol[1,6] == z0[3])
-        @NLconstraint(mdl,          z_Ol[1,7] == z0[6])
+        @NLconstraint(mdl,          z_Ol[1,7] == z0[7])
 
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] <= ey_max + eps[i])
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] >= -ey_max - eps[i])
@@ -322,12 +322,12 @@ type MpcModel_pF
         @NLobjective(mdl, Min, costZ + derivCost + controlCost)
 
         # create first artificial solution (for warm start)
-        for i=1:N+1
-            setvalue(z_Ol[i,:],[(i-1)*dt*v_ref 0 0 v_ref 0])
-        end
-        for i=1:N
-            setvalue(u_Ol[i,:],[0.15 0])
-        end
+        # for i=1:N+1
+        #     setvalue(z_Ol[i,:],[(i-1)*dt*v_ref 0 0 v_ref 0])
+        # end
+        # for i=1:N
+        #     setvalue(u_Ol[i,:],[0.15 0])
+        # end
         # First solve
         sol_stat=solve(mdl)
         println("Finished solve 1: $sol_stat")
