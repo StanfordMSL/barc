@@ -79,7 +79,7 @@ function simDynModel(z::Array{Float64},u::Array{Float64},dt::Float64,coeff::Arra
 end
 
 function pacejka(a)
-    B = 1.0             # This value determines the steepness of the curve
+    B = 5.0 #1.0             # This value determines the steepness of the curve
     C = 1.25
     mu = 0.8            # Friction coefficient (responsible for maximum lateral tire force)
     m = 1.98

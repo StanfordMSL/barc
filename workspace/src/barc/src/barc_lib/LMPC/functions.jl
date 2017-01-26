@@ -48,11 +48,11 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcParams.N                 = 12
     mpcParams.Q                 = [5.0,0.0,0.0,1.0,10.0,0.0]   # Q (only for path following mode)
     mpcParams.vPathFollowing    = 0.9                           # reference speed for first lap of path following
-    mpcParams.Q_term            = 1.0*[50.0,50.0,50.0,50.0]  #m # weights for terminal constraints (LMPC, for xDot,yDot,psiDot,ePsi,eY)
+    mpcParams.Q_term            = 1.0*[500.0,500.0,500.0,500.0]  #m # weights for terminal constraints (LMPC, for xDot,yDot,psiDot,ePsi,eY)
     mpcParams.R                 = 0.0*[10.0,10.0]                 # put weights on a and d_f
     mpcParams.QderivZ           = 1.0*[0,1,1,1] #m            # cost matrix for derivative cost of states
     mpcParams.QderivU           = 1.0*[5.0,100.0]                # cost matrix for derivative cost of inputs
-    mpcParams.Q_term_cost       = 3.0                         # scaling of Q-function
+    mpcParams.Q_term_cost       = 2.0                         # scaling of Q-function
     mpcParams.Q_modelError      = 0.1                         # scaling of error between reference parameter and chosen parameter
 
     mpcParams.delay_df          = 3                             # steering delay
@@ -92,10 +92,13 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
 
     mpcTraj.closedLoopSEY       = zeros(buffersize,7,30)
     mpcTraj.inputHistory        = zeros(buffersize,3,30)
+    mpcTraj.xfStates            = zeros(buffersize,5,30)    # safe set dimension = 5
     mpcTraj.cost                = zeros(buffersize,30)
     mpcTraj.idx_end             = zeros(30) # all data points until between 0 <= s <= lapLength
     mpcTraj.count               = ones(30) #total number of saved data points for each lap
-
+    mpcTraj.xfRange             = zeros(Int64,buffersize,2,2,30) #total number of saved data points for each lap
+    mpcTraj.selected_Laps       = zeros(Int64,buffersize,2,30)
+    mpcTraj.count               = ones(30) #total number of saved data points for each lap
 
     mpcCoeff.order              = 5
     mpcCoeff.coeffCost          = zeros(mpcCoeff.order+1,2)

@@ -18,20 +18,21 @@ function coeffConstraintCost(mpcTraj::MpcTrajectory, mpcCoeff::MpcCoeff, posInfo
     selected_laps = zeros(Int64,2)
     selected_laps[1] = lapStatus.currentLap-1                                   # use previous lap
     selected_laps[2] = lapStatus.currentLap-2                                   # and the one before
-    if lapStatus.currentLap >= 4
-        selected_laps[2] = indmin(mpcTraj.cost[1,2:lapStatus.currentLap-2])+1      # and the best from all previous laps
-    end
+    # TODO: Undo comment: He should actually take best lap
+    # if lapStatus.currentLap >= 4
+    #     selected_laps[2] = indmin(mpcTraj.cost[1,2:lapStatus.currentLap-2])+1      # and the best from all previous laps
+    # end
 
+    xfRange = zeros(2,2)
     # Redo component calculation for the two selected_laps
     for kkk = 1:2
         lapNum = selected_laps[kkk]
-        oldS            = mpcTraj.closedLoopSEY[:,1,lapNum]
-        oldeY           = mpcTraj.closedLoopSEY[:,2,lapNum]
-        oldePsi         = mpcTraj.closedLoopSEY[:,3,lapNum]
-        oldV            = mpcTraj.closedLoopSEY[:,4,lapNum]
-        oldRho          = mpcTraj.closedLoopSEY[:,5,lapNum]
-
-    
+        data_end = mpcTraj.count[lapNum]-1
+        oldS            = mpcTraj.closedLoopSEY[1:data_end,1,lapNum]
+        oldeY           = mpcTraj.closedLoopSEY[1:data_end,2,lapNum]
+        oldePsi         = mpcTraj.closedLoopSEY[1:data_end,3,lapNum]
+        oldV            = mpcTraj.closedLoopSEY[1:data_end,4,lapNum]
+        oldRho          = mpcTraj.closedLoopSEY[1:data_end,5,lapNum]
 
         # TODO: Check if using s instead of s_total causes problems
         # Compute the index
@@ -40,7 +41,8 @@ function coeffConstraintCost(mpcTraj::MpcTrajectory, mpcCoeff::MpcCoeff, posInfo
         
         vec_range = idx_s:idx_s+pLength
         bS_Vector = oldS[vec_range]
-
+        xfRange[1,kkk] = vec_range[1]
+        xfRange[2,kkk] = vec_range[end]
 
         # Create the Matrices for the interpolation
         MatrixInterp = zeros(pLength+1,Order+1)
@@ -64,6 +66,6 @@ function coeffConstraintCost(mpcTraj::MpcTrajectory, mpcCoeff::MpcCoeff, posInfo
         costVector = mpcTraj.cost[vec_range,lapNum]                               # decreases in equal steps
         mpcCoeff.coeffCost[:,kkk] = MatrixInterp[:,:]\costVector           # interpolate this vector with the given s
     end
-    nothing
+    return (xfRange,selected_laps)
 end
 

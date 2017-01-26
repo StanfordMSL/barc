@@ -107,8 +107,24 @@ function computeCost!(mpcTraj::MpcTrajectory,lapStatus::LapStatus,posInfo::PosIn
     return nothing
 
   end
+  # this is only used to determine the chosen terminal states (for plotting)
+  function evaluateTerminalConstraint(mpcSol::MpcSol,mpcCoeff::MpcCoeff,mpcParams::MpcParams)
+    N = mpcParams.N
+    ParInt = mpcSol.ParInt
+    ss = mpcCoeff.coeffConst #safe set approximation polynomial coefficients
+    sF = mpcSol.z[N+1,1]
 
+    ey_F = (ParInt*(sF^5*ss[1,1,1]+sF^4*ss[2,1,1]+sF^3*ss[3,1,1]+sF^2*ss[4,1,1]+sF*ss[5,1,1]+ss[6,1,1]) + (1-ParInt)*(sF^5*ss[1,2,1]+sF^4*ss[2,2,1]+sF^3*ss[3,2,1]+sF^2*ss[4,2,1]+sF*ss[5,2,1]+ss[6,2,1]))
 
+    epsi_F = (ParInt*(sF^5*ss[1,1,2]+sF^4*ss[2,1,2]+sF^3*ss[3,1,2]+sF^2*ss[4,1,2]+sF*ss[5,1,2]+ss[6,1,2]) + (1-ParInt)*(sF^5*ss[1,2,2]+sF^4*ss[2,2,2]+sF^3*ss[3,2,2]+sF^2*ss[4,2,2]+sF*ss[5,2,2]+ss[6,2,2]))
+
+    v_F = (ParInt*(sF^5*ss[1,1,3]+sF^4*ss[2,1,3]+sF^3*ss[3,1,3]+sF^2*ss[4,1,3]+sF*ss[5,1,3]+ss[6,1,3]) + (1-ParInt)*(sF^5*ss[1,2,3]+sF^4*ss[2,2,3]+sF^3*ss[3,2,3]+sF^2*ss[4,2,3]+sF*ss[5,2,3]+ss[6,2,3]))
+
+    rho_F = (ParInt*(sF^5*ss[1,1,4]+sF^4*ss[2,1,4]+sF^3*ss[3,1,4]+sF^2*ss[4,1,4]+sF*ss[5,1,4]+ss[6,1,4]) + (1-ParInt)*(sF^5*ss[1,2,4]+sF^4*ss[2,2,4]+sF^3*ss[3,2,4]+sF^2*ss[4,2,4]+sF*ss[5,2,4]+ss[6,2,4]))
+
+    xF = [sF;ey_F;epsi_F;v_F;rho_F]
+    return xF
+  end
 # This is the main function, it is called when the node is started.
 function main()
     
@@ -147,7 +163,7 @@ function main()
 
     # Logging variables
     log_coeff_Cost              = NaN*ones(mpcCoeff.order+1,2,10000)
-    log_coeff_Const             = NaN*ones(mpcCoeff.order+1,2,4,10000)
+    log_coeff_Const             = NaN*ones(mpcCoeff.order+1,2,4,400,30)
     log_sol_z                   = NaN*ones(max_N+1,7,10000)
     log_sol_u                   = NaN*ones(max_N,3,10000)
     log_curv                    = zeros(10000,trackCoeff.nPolyCurvature+1)
@@ -162,7 +178,7 @@ function main()
     log_t_solv                  = zeros(10000)
     log_numIter                 = zeros(Int64,30)
     log_sol_status              = Array(Symbol,10000)
-    
+    log_mpc_sol_z               = zeros(10000,max_N+1,7,30)
     acc_f                       = [0.0]
     rhoRef                      = 1.0/modelParams.l_A
     rhoEst                      = rhoRef                # for pathfollowing, will be later overwriten in mpc laps
@@ -195,14 +211,19 @@ function main()
     mpcSol.d_f = 0
     
     # Precompile coeffConstraintCost:
+    xfRange = zeros(2,2)
+    selected_Laps = zeros(Int64,2)
     mpcTraj.closedLoopSEY[1:buffersize,1,1] = linspace(0,posInfo.s_target,buffersize)
     mpcTraj.closedLoopSEY[1:buffersize,1,2] = linspace(0,posInfo.s_target,buffersize)
+    mpcTraj.count[1:2] = buffersize
     posInfo.s = posInfo.s_target/2
     lapStatus.currentLap = 3
-    coeffConstraintCost(mpcTraj,mpcCoeff,posInfo,mpcParams,lapStatus)
+    (xfRange,selected_Laps) = coeffConstraintCost(mpcTraj,mpcCoeff,posInfo,mpcParams,lapStatus)
     lapStatus.currentLap = 1
     mpcTraj.closedLoopSEY[1:buffersize,1,1] = zeros(buffersize,1)
     mpcTraj.closedLoopSEY[1:buffersize,1,2] = zeros(buffersize,1)
+    mpcTraj.count[1:2] = 1
+
     posInfo.s = 0
     println("Precompiling of coeffConstraintCost() completed!")
 
@@ -277,7 +298,9 @@ function main()
             # Find coefficients for cost and constraints
             if lapStatus.currentLap > n_pf
                 tic()
-                coeffConstraintCost(mpcTraj,mpcCoeff,posInfo,mpcParams,lapStatus)
+                (xfRange,selected_Laps) = coeffConstraintCost(mpcTraj,mpcCoeff,posInfo,mpcParams,lapStatus)
+                mpcTraj.xfRange[mpcTraj.count[lapStatus.currentLap],:,:,lapStatus.currentLap] = xfRange
+                mpcTraj.selected_Laps[mpcTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = selected_Laps
                 tt = toq()
             end
 
@@ -300,6 +323,7 @@ function main()
                 acc_f[1] = mpcSol.z[1,7]
                 z0 = mpcSol.z[1,:]
                 u0 = mpcSol.u[1,:]
+                mpcTraj.xfStates[mpcTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = evaluateTerminalConstraint(mpcSol,mpcCoeff,mpcParams)
             end
 
             #  ======================================= Save States for Safe Set =======================================
@@ -339,7 +363,7 @@ function main()
             log_state[k,:]          = zCurr[i,:]
             log_cmd[k+1,:]          = uCurr[i,:]                    # the command is going to be pubished in the next iteration
             log_coeff_Cost[:,:,k]   = mpcCoeff.coeffCost
-            log_coeff_Const[:,:,:,k] = mpcCoeff.coeffConst
+            log_coeff_Const[:,:,:,lapStatus.currentIt,lapStatus.currentLap] = mpcCoeff.coeffConst
             log_cost[k,:]           = mpcSol.cost
             log_curv[k,:]           = trackCoeff.coeffCurvature
             log_state_x[k,:]        = x_est
@@ -351,6 +375,7 @@ function main()
 
                 log_sol_u[1:mpcParams_pF.N,1:2,k]         = mpcSol.u        # log (a, dF)
             else #LMPC case
+                log_mpc_sol_z[lapStatus.currentIt,1:mpcParams.N+1,1:7,lapStatus.currentLap] = mpcSol.z
                 log_sol_z[1:mpcParams.N+1,1:7,k]        = mpcSol.z
                 log_sol_u[1:mpcParams.N,:,k]            = mpcSol.u
             end
@@ -374,7 +399,7 @@ function main()
     save(log_path,"oldTraj",oldTraj,"state",log_state[1:k,:],"t",log_t[1:k],"sol_z",log_sol_z[:,:,1:k],"sol_u",log_sol_u[:,:,1:k],
                     "cost",log_cost[1:k,:],"curv",log_curv[1:k,:],"coeffCost",log_coeff_Cost,"coeffConst",log_coeff_Const,
                     "x_est",log_state_x[1:k,:],"coeffX",log_coeffX[1:k,:],"coeffY",log_coeffY[1:k,:],"cmd",log_cmd[1:k,:],"step_diff",log_step_diff[1:k,:],
-                    "t_solv",log_t_solv[1:k],"sol_status",log_sol_status[1:k],"numIter",log_numIter,"mpcTraj",mpcTraj)
+                    "t_solv",log_t_solv[1:k],"sol_status",log_sol_status[1:k],"numIter",log_numIter,"mpcTraj",mpcTraj,"mpcParams",mpcParams,"mpcParams_pF",mpcParams_pF,"log_mpc_sol_z",log_mpc_sol_z)
     println("Exiting LMPC node. Saved data to $log_path.")
 
 end

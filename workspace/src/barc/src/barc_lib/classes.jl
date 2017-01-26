@@ -41,10 +41,13 @@ end
 type MpcTrajectory
     closedLoopSEY::Array{Float64}
     inputHistory::Array{Float64}
+    xfStates::Array{Float64}
     cost::Array{Float64}
     idx_end::Array{Int64}
     count::Array{Int64}
-    MpcTrajectory(closedLoopSEY=Float64[],inputHistory=Float64[],cost=Float64[],idx_end=Int64[],count=Int64[]) = new(closedLoopSEY,inputHistory,cost,idx_end,count)
+    xfRange::Array{Int64}
+    selected_Laps::Array{Int64}
+    MpcTrajectory(closedLoopSEY=Float64[],inputHistory=Float64[],xfStates=Float64[],cost=Float64[],idx_end=Int64[],count=Int64[],xfRange=Int64[],selected_Laps=Int64[]) = new(closedLoopSEY,inputHistory,xfStates,cost,idx_end,count,xfRange,selected_Laps)
 end
 type MpcParams          # parameters for MPC solver
     N::Int64
@@ -77,7 +80,8 @@ type MpcSol             # MPC solution output
     u::Array{Float64}
     z::Array{Float64}
     cost::Array{Float64}
-    MpcSol(a_x=0.0,d_f=0.0,phi=0.0,solverStatus=Symbol(),u=Float64[],z=Float64[],cost=Float64[]) = new(a_x,d_f,phi,solverStatus,u,z,cost)
+    ParInt::Float64
+    MpcSol(a_x=0.0,d_f=0.0,phi=0.0,solverStatus=Symbol(),u=Float64[],z=Float64[],cost=Float64[],ParInt=0.0) = new(a_x,d_f,phi,solverStatus,u,z,cost,ParInt)
 end
 
 type TrackCoeff         # coefficients of track

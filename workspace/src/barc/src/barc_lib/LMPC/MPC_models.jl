@@ -149,7 +149,7 @@ type MpcModel
 
         # Lane cost
         # ---------------------------------
-        @NLexpression(mdl, laneCost, sum{10*eps[i]+100*eps[i]^2,i=2:N+1}) #m: FIXME improve soft constraint not for every i a new eps
+        @NLexpression(mdl, laneCost, sum{20*eps[i]+200*eps[i]^2,i=2:N+1}) #m: FIXME improve soft constraint not for every i a new eps
 
         # Control Input cost
         # ---------------------------------
@@ -164,7 +164,7 @@ type MpcModel
         # Terminal cost
         # ---------------------------------
         # The value of this cost determines how fast the algorithm learns. The higher this cost, the faster the control tries to reach the finish line.
-        @NLexpression(mdl, costZTerm, (ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
+        @NLexpression(mdl, costZTerm,  (ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
                                       (1-ParInt)*(sum{coeffTermCost[i,2]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,2])))
 
         # Model error cost (deviation in steering error e_ψ from reference model)

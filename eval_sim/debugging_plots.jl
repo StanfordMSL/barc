@@ -4,10 +4,9 @@ module debugModule
     using JLD
     using PyPlot
     using PyCall
-      @pyimport matplotlib.animation as animation
-      @pyimport matplotlib as mpl
-      @pyimport matplotlib.patches as patches
-      using JLD, ProfileView
+    @pyimport matplotlib.animation as animation
+    @pyimport matplotlib as mpl
+    @pyimport matplotlib.patches as patches
     export Measurements, plotStates, animateState2
     # pos_info[1]  = s
     # pos_info[2]  = eY
@@ -143,120 +142,68 @@ module debugModule
     end
 
 
-    function eval_sim(code::AbstractString)
-        log_path_sim = "$(homedir())/simulations/output-SIM-$(code).jld"
-        log_path_record = "$(homedir())/simulations/output-record-$(code).jld"
-        d_sim = load(log_path_sim)
-        d_rec = load(log_path_record)
-
-        imu_meas    = d_sim["imu_meas"]
-        gps_meas    = d_sim["gps_meas"]
-        z           = d_sim["z"]
-        cmd_log     = d_sim["cmd_log"]
-        slip_a      = d_sim["slip_a"]
-        pos_info    = d_rec["pos_info"]
-        vel_est     = d_rec["vel_est"]
-
-        t0 = pos_info.t[1]
-        track = create_track(0.4)
-
-        figure()
-        ax1=subplot(311)
-        plot(z.t-t0,z.z,"-*")
-        title("Real states")
-        grid()
-        legend(["x","y","v_x","v_y","psi","psi_dot","a","d_f"])
-        subplot(312,sharex=ax1)
-        plot(cmd_log.t-t0,cmd_log.z,"-*")
-        title("Inputs")
-        grid()
-        legend(["u","d_f"])
-        subplot(313,sharex=ax1)
-        plot(slip_a.t-t0,slip_a.z,"-*")
-        title("Slip angles")
-        grid()
-        legend(["a_f","a_r"])
-
-        figure()
-        plot(z.z[:,1],z.z[:,2],"-",gps_meas.z[:,1],gps_meas.z[:,2],".",pos_info.z[:,6],pos_info.z[:,7],"-")
-        plot(track[:,1],track[:,2],"b.",track[:,3],track[:,4],"r-",track[:,5],track[:,6],"r-")
-        grid(1)
-        title("x-y-view")
-        axis("equal")
-        legend(["Real state","GPS meas","Estimate"])
-        
-        figure()
-        title("Comparison of psi")
-        plot(imu_meas.t-t0,imu_meas.z,"-x",z.t-t0,z.z[:,5:6],pos_info.t-t0,pos_info.z[:,10:11],"-*")
-        legend(["imu_psi","imu_psi_dot","real_psi","real_psi_dot","est_psi","est_psi_dot"])
-        grid()
-
-        figure()
-        title("Comparison of v")
-        plot(z.t-t0,z.z[:,3:4],z.t-t0,sqrt(z.z[:,3].^2+z.z[:,4].^2),pos_info.t-t0,pos_info.z[:,8:9],"-*",pos_info.t-t0,sqrt(pos_info.z[:,8].^2+pos_info.z[:,9].^2),"-*",vel_est.t-t0,vel_est.z)
-        legend(["real_xDot","real_yDot","real_v","est_xDot","est_yDot","est_v","v_x_meas"])
-        grid()
-
-        figure()
-        title("Comparison of x,y")
-        plot(z.t-t0,z.z[:,1:2],pos_info.t-t0,pos_info.z[:,6:7],"-*",gps_meas.t-t0,gps_meas.z)
-        legend(["real_x","real_y","est_x","est_y","meas_x","meas_x"])
-        grid()
-    end
-
-     function animateState2(code::AbstractString,iii::Int64,stateNum::Int64=2,plotOverK::Bool=true,offset::Int64=0,speed::Int64=500 )
+    function animateState2(code::AbstractString,iii::Int64,stateNum::Int64=2,plotOverK::Bool=true,offset::Int64=0,speed::Int64=500 )
     if iii < 3; error("Please specify Iteration from LMPC with iterNum > 2") end
     if offset < 0; error("Offset must be a positive integer") end
-    if !(2 <= stateNum <= 5); error("Specify a state number between 2 and 6") end
+    if !(2 <= stateNum <= 5); error("Specify a state number between 2 and 5") end
     
-    log_path_sim = "$(homedir())/simulations/output-SIM-$(code).jld"
-    log_path_record = "$(homedir())/simulations/output-record-$(code).jld"
+    #log_path_sim = "$(homedir())/simulations/output-SIM-$(code).jld"
+    #log_path_record = "$(homedir())/simulations/output-record-$(code).jld"
     log_path_LMPC   = "$(homedir())/simulations/output-LMPC-$(code).jld"
 
-    d_rec       = load(log_path_record)
+    #d_rec       = load(log_path_record)
     d_lmpc      = load(log_path_LMPC)
 
 
-    # load the data
-
-    # from recorder node
-    pos_info    = d_rec["pos_info"]
 
     # from lmpc node
-    oldTraj     = d_lmpc["oldTraj"]
-    mpcTraj     = d_lmpc["mpcTraj"]
-    t           = d_lmpc["t"]
-    state       = d_lmpc["state"]
-    sol_z       = d_lmpc["sol_z"]
-    sol_u       = d_lmpc["sol_u"]
-    cost        = d_lmpc["cost"]
-    numIter     = d_lmpc["numIter"]
+    mpcTraj     = d_lmpc["mpcTraj"] #holds closed loop states
+    openLoopSEY = d_lmpc["log_mpc_sol_z"] #open loop mpc states
+    numIter     = d_lmpc["numIter"] #holds number of steps per iteration
+    coeffConst = d_lmpc["coeffConst"]
+    mpcParams   = d_lmpc["mpcParams"]
+    mpcParams_pF= d_lmpc["mpcParams_pF"] 
 
-
-
-    # TODO: Remove hard code
-    N_PF = 15
-    N = 12 
+    N_PF = mpcParams_pF.N
+    N = mpcParams.N
 
     # Define array of state names
-    stateNames = ["s","ey","epsi","v","rho","epsiRef","filter"]
+    stateNames = ["s","ey","epsi","v","rho"]    
     pygui(true)
-    fig = figure(facecolor="white",figsize=(15,10))
+    fig = figure(facecolor="white")
     PyPlot.grid(true)
     PyPlot.ylabel(stateNames[stateNum],fontsize=20)
     PyPlot.title("Trajectory and open loop for $(stateNames[stateNum])",fontsize=20)
 
-    steps_prev = length(mpcTraj.closedLoopSEY[:,1,iii-1])
-    steps_cl = length(mpcTraj.closedLoopSEY[:,1,iii])
-    # Define lines
-    state_prev = plot([],[],"g-",linewidth=2.0,label="PF C.l.")[1]
-    state_closedloop = plot([],[],"k-",linewidth=2.0,label="Sys C.L.")[1]
-    #state_mismatch = plot([],[],"c--",linewidth=2.0,label="MPC C.L.")[1]
-    state_openloop = plot([],[],"b-+",linewidth=2.0,markersize=10.0, label="O.L. Pred")[1]
-    state_approx = plot([],[],"r-",linewidth=2.0, label="SS approx")[1]
-    state_approxPoints = plot([],[],"r+",markersize=10.0)[1]
+    # TODO: Plotting of best and previous trajectories
+    # determine indizes of best and previous lap
+    prevInd = mpcTraj.selected_Laps[1,1,iii]
+    bestInd = mpcTraj.selected_Laps[1,2,iii]
+
+    # determine length of data points for best trajectory and previous trajectory
+    steps_prev = mpcTraj.count[prevInd] - 1
+    steps_best = mpcTraj.count[bestInd] - 1
+    steps_cl = mpcTraj.idx_end[iii]
+
+    # Define lines to be plotted
+    state_prev = plot([],[],"g--",linewidth=2.0,label="Prev C.l.")[1] #Closed loop state trajectory of prev Iteration
+    state_best = plot([],[],"m--",linewidth=2.0,label="Best C.l.")[1] #Closed loop state trajectory of best Iteration
+    state_ss = plot([],[],"r-",linewidth=2.0,label="Used SS")[1] #Safe set (convex combination (lambda!) of best and prev iteration polynomials )
+
+    state_closedloop = plot([],[],"k-",linewidth=2.0,label="Sys C.L.")[1] # actual closed loop state of current iteration
+    #state_mismatch = plot([],[],"c--",linewidth=2.0,label="MPC C.L.")[1] # predicted next closed loop state from mpc
+    state_openloop = plot([],[],"b-+",linewidth=2.0,markersize=10.0, label="O.L. Pred")[1] #MPC open loop predictions
+
+    state_approxPrev = plot([],[],"g-",linewidth=2.0, label="SS approx Prev")[1]  #polynomial approximation of prev iteration
+    state_approxPointsPrev = plot([],[],"g*",markersize=7.0)[1]                  # used points for polynomial approx
+    state_approxBest = plot([],[],"m-",linewidth=2.0, label="SS approx Best")[1]  # polynomial approximation of best iteration
+    state_approxPointsBest = plot([],[],"m*",markersize=7.0)[1]                  # used points
+
+
+    # define position of legend
     PyPlot.legend(fontsize=20,bbox_to_anchor=(1.1, 1.1))
 
+    #set axis limits
     kMin = 1
     kMax = steps_prev
     sMin = 0
@@ -271,8 +218,8 @@ module debugModule
     rhoMax = maximum(mpcTraj.closedLoopSEY[:,5,iii]) + 5
     
 
-    ylimBtm = [sMin,eyMin,epsiMin,vMin,rhoMin,epsiMin,-10]
-    ylimTop = [sMax,eyMax,epsiMax,vMax,rhoMax,epsiMax,10]
+    ylimBtm = [sMin,eyMin,epsiMin,vMin,rhoMin]
+    ylimTop = [sMax,eyMax,epsiMax,vMax,rhoMax]
     axes =gca()
 
     myMin = ylimBtm[stateNum]
@@ -287,62 +234,132 @@ module debugModule
       PyPlot.xlabel("s",fontsize=20)
     end
 
+    # TODO: Add texts back about lambda and xf violation
+    # print text info about lambda and xF violation 
+    # (left, nothing) = axes[:get_xlim]()
+    # (nothing,top) = axes[:get_ylim]()
+    # top = top - (top/10.0)
+    # eps_text = text(left,top,"lambda=",fontsize=15)
+    # lambda_text = text(left,top-top/(20.0),"xF Violation=",fontsize=15)
+  
 
-    function init_plot()
-        # plot background: previous trajectory (SS) and closed loop trajectory
-        if plotOverK
-          state_prev[:set_data]([1:1:steps_prev],[mpcTraj.closedLoopSEY[:,stateNum,iii-1]])
-          state_closedloop[:set_data]([1:1:steps_cl],[mpcTraj.closedLoopSEY[:,stateNum,iii]])
-          #state_mismatch[:set_data]([1:1:steps_cl],[Iterations[iii].openLoopSEY[stateNum,2,:]]) #FIXME Also check here if ytrue time index used or it has to be t-1
-        else
-          state_prev[:set_data]([Iterations[iii-1].closedLoopSEY[1,:]],[mpcTraj.closedLoopSEY[:,stateNum,iii-1]])
-          state_closedloop[:set_data]([mpcTraj.closedLoopSEY[:,1,iii]],[mpcTraj.closedLoopSEY[:,stateNum,iii]])
-          #state_mismatch[:set_data]([Iterations[iii].openLoopSEY[1,2,:]],[Iterations[iii].openLoopSEY[stateNum,2,:]])
-        end
+  function init_plot()
+    # plot background: previous trajectory (SS) and closed loop trajectory
+    if plotOverK
 
-      return (state_prev,state_closedloop,nothing)
+      state_prev[:set_data]([1:1:steps_prev],[mpcTraj.closedLoopSEY[1:steps_prev,stateNum,prevInd]])
+      state_best[:set_data]([1:1:steps_best],[mpcTraj.closedLoopSEY[1:steps_best,stateNum,bestInd]])
+      state_ss[:set_data]([(N+1):1:steps_cl+N],[mpcTraj.xfStates[1:steps_cl,stateNum,iii]])
+      state_closedloop[:set_data]([1:1:steps_cl],[mpcTraj.closedLoopSEY[1:steps_cl,stateNum,iii]])
+      #state_mismatch[:set_data]([2:1:steps_cl],[Iterations[iii].openLoopSEY[stateNum,2,1:steps_cl-1]]) #FIXME Also check here if ytrue time index used or it has to be t-1
+    else
+      state_prev[:set_data]([mpcTraj.closedLoopSEY[1:steps_prev,1,prevInd]],[mpcTraj.closedLoopSEY[1:steps_prev,stateNum,prevInd]])
+      state_best[:set_data]([mpcTraj.closedLoopSEY[1:steps_best,1,bestInd]],[mpcTraj.closedLoopSEY[1:steps_best,stateNum,bestInd]])
+      state_ss[:set_data]([mpcTraj.xfStates[1:steps_cl,1,iii]],[mpcTraj.xfStates[1:steps_cl,stateNum,iii]]) 
+      state_closedloop[:set_data]([mpcTraj.closedLoopSEY[1:steps_cl,1,iii]],[mpcTraj.closedLoopSEY[1:steps_cl,stateNum,iii]])
+      #state_mismatch[:set_data]([Iterations[iii].openLoopSEY[1,2,:]],[Iterations[iii].openLoopSEY[stateNum,2,:]])
     end
+
+    return (state_prev,state_best,state_ss,state_closedloop,nothing)
+  end
 
     function animate(frameNum)
       frameNum += 1
       k = frameNum + offset
 
+      
+       ss_ind = [prevInd,bestInd]
+       approxLines = [state_approxPointsPrev state_approxPointsBest; state_approxPrev state_approxBest]
+
       if plotOverK
         # Update open loop trajectory data
-        state_openloop[:set_data]([k:1:k+N],[Iterations[iii].openLoopSEY[stateNum,:,k]])
+        state_openloop[:set_data]([k:1:k+N],[openLoopSEY[k,1:N+1,stateNum,iii]])
+        for i=1:2
+          ind = ss_ind[i]
+          xfRangeMin = Int64(mpcTraj.xfRange[k,1,i,iii])
+          xfRangeMax = Int64(mpcTraj.xfRange[k,2,i,iii])
+          sRange = mpcTraj.closedLoopSEY[xfRangeMin:xfRangeMax,1,ind]
+          stateRange = mpcTraj.closedLoopSEY[xfRangeMin:xfRangeMax,stateNum,ind]
 
-        # Update s-ey data points of safe set trajectory
-        xfRangeMin = Int64(Iterations[iii].xfRange[1,k])
-        xfRangeMax = Int64(Iterations[iii].xfRange[2,k])
-        sRange = Iterations[iii-1].openLoopSEY[1,xfRangeMin:1:xfRangeMax]
-        stateRange = Iterations[iii-1].openLoopSEY[stateNum,xfRangeMin:1:xfRangeMax]
-        state_approxPoints[:set_data]([xfRangeMin:1:xfRangeMax],[stateRange])
+          # plot approximation points used for interpolation over k
+          approxLines[1,i][:set_data]([xfRangeMin:1:xfRangeMax],[stateRange])
 
-        # evaluate polynomial approximation of safe set points and update data
-        ss = Iterations[iii].xfApproxCoeff[:,stateNum-1,k]
-        statePoly = sRange.^5 *ss[1] + sRange.^4 *ss[2] + sRange.^3 *ss[3] + sRange.^2 *ss[4] + sRange*ss[5] + ss[6]
-        state_approx[:set_data]([xfRangeMin:1:xfRangeMax],[statePoly])
+
+          # get polynomail coefficients
+          ss = coeffConst[:,i,stateNum-1,k,iii]
+           # determine used polynomial order
+          poly_order = size(ss,1) - 1 
+          # evaluate polynomial in sRange
+          statePoly = sum(sRange.^(poly_order+1-p) * ss[p] for p=1:poly_order + 1 )
+          approxLines[2,i][:set_data]([xfRangeMin:1:xfRangeMax],[statePoly])
+        end      
       else
         # Update open loop trajectory data
-        state_openloop[:set_data]([Iterations[iii].openLoopSEY[1,:,k]],[Iterations[iii].openLoopSEY[stateNum,:,k]])
+        state_openloop[:set_data]([openLoopSEY[k,1:N+1,1,iii]],[openLoopSEY[k,1:N+1,stateNum,iii]])
 
-        # Update s-ey data points of safe set trajectory
-        xfRangeMin = Int64(Iterations[iii].xfRange[1,k])
-        xfRangeMax = Int64(Iterations[iii].xfRange[2,k])
-        sRange = Iterations[iii-1].openLoopSEY[1,xfRangeMin:1:xfRangeMax]
-        stateRange = Iterations[iii-1].openLoopSEY[stateNum,xfRangeMin:1:xfRangeMax]
-        state_approxPoints[:set_data]([sRange],[stateRange])
+        for i=1:2
+          ind = ss_ind[i]
+          xfRangeMin = Int64(mpcTraj.xfRange[k,1,i,iii])
+          xfRangeMax = Int64(mpcTraj.xfRange[k,2,i,iii])
+          sRange = mpcTraj.closedLoopSEY[xfRangeMin:xfRangeMax,1,ind]
+          stateRange = mpcTraj.closedLoopSEY[xfRangeMin:xfRangeMax,stateNum,ind]
 
-        # evaluate polynomial approximation of safe set points and update data
-        ss = Iterations[iii].xfApproxCoeff[:,stateNum-1,k]
-        statePoly = sRange.^5 *ss[1] + sRange.^4 *ss[2] + sRange.^3 *ss[3] + sRange.^2 *ss[4] + sRange*ss[5] + ss[6]
-        state_approx[:set_data]([sRange],[statePoly])
+          # plot approximation points used for interpolation over k
+          approxLines[1,i][:set_data]([sRange],[stateRange])
+
+          # get polynomail coefficients
+          ss = coeffConst[:,i,stateNum-1,k,iii]
+          # evaluate polynomial in sRange
+          poly_order = size(ss,1) - 1 
+          statePoly = sum(sRange.^(poly_order+1-p) * ss[p] for p=1:poly_order + 1 )
+          approxLines[2,i][:set_data]([sRange],[statePoly])
+        end
       end
-      return (state_openloop,state_approx,state_approxPoints,nothing)
+
+      # # update text about softconstrain violation and color
+      # lambda_text[:set_text]("lambda = $(Iterations[iii].lambdas[k])")
+      # eps_text[:set_text]("xF Violation = $(Iterations[iii].epsvec[stateNum-1,k])")
+      # if Iterations[iii].epsvec[stateNum-1,k] > 0.01
+      #   eps_text[:set_color]("r")
+      # else
+      #   eps_text[:set_color]("g")
+      # end
+
+      # return (state_openloop,state_approxPrev,state_approxPointsPrev,state_approxBest, state_approxPointsBest,eps_text,lambda_text,nothing)
+      return (state_openloop,nothing)
     end
-    NumFrames = length(Iterations[iii].openLoopSEY[1,:]) - offset
-    anim = animation.FuncAnimation(fig, animate, init_func=init_plot, frames=NumFrames, interval=speed,repeat=false)
+      NumFrames = length(mpcTraj.closedLoopSEY[:,1,iii]) - offset
+      anim = animation.FuncAnimation(fig, animate, init_func=init_plot, frames=NumFrames, interval=speed,repeat=false)
   end
+
+
+
+
+
+    function showCost(code::AbstractString)
+        log_path_LMPC   = "$(homedir())/simulations/output-LMPC-$(code).jld"
+        log_path_record = "$(homedir())/simulations/output-record-$(code).jld"
+        d_rec       = load(log_path_record)
+        d_lmpc      = load(log_path_LMPC)
+
+        t           = d_lmpc["t"]
+        state       = d_lmpc["state"]
+        cost        = d_lmpc["cost"]
+        
+
+        t0 = t[1]
+
+        figure()
+        ax1=subplot(211)
+        title("MPC states and cost")
+        plot(t-t0,state)
+        legend(["s","ey","epsi","v","rho","epsiRef","filter"])
+        grid(1)
+        subplot(212,sharex = ax1)
+        plot(t-t0,cost)
+        grid(1)
+        legend(["costZ","costZTerm (term. constr.)","constZTerm (term. cost)","derivCost","controlCost","laneCost","modelErrorCost"])
+    end
 end #MODULE
     # add_curve(theta,30,0)
     # add_curve(theta,20,-pi/6)
