@@ -52,8 +52,8 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     mpcParams.R                 = [0.0,0.0]                 # put weights on a and d_f
     mpcParams.QderivZ           = 1.0*[0,0,0,0,0.0] #m            # cost matrix for derivative cost of states
     mpcParams.QderivU           = 1.0*[5.0,10.0,0.0]                # cost matrix for derivative cost of inputs
-    mpcParams.Q_term_cost       = 3.0                         # scaling of Q-function
-    mpcParams.Q_modelError      = 10.0                         # scaling of error between reference parameter and chosen parameter
+    mpcParams.Q_term_cost       = 5.0                         # scaling of Q-function
+    mpcParams.Q_modelError      = 20.0                         # scaling of error between reference parameter and chosen parameter
 
     mpcParams.delay_df          = 3                             # steering delay
     mpcParams.delay_a           = 1                             # acceleration delay
@@ -71,14 +71,14 @@ function InitializeParameters(mpcParams::MpcParams,mpcParams_pF::MpcParams,track
     trackCoeff.coeffCurvature   = zeros(trackCoeff.nPolyCurvature+1)         # polynomial coefficients for curvature approximation (zeros for straight line)
     trackCoeff.width            = 0.6                       # width of the track (0.5m)
 
-    modelParams.l_A             = 0.125#25 #l.A is used to calculate rhoRef
-    modelParams.l_B             = 0.125 
+    modelParams.l_A             = 0.1 #0.125 #l.A is used to calculate rhoRef
+    modelParams.l_B             = 0.1 #0.125 
     modelParams.dt              = 0.1                   # sampling time, also controls the control loop, affects delay_df and Qderiv
     modelParams.m               = 1.98
     modelParams.I_z             = 0.03
     modelParams.c_f             = 0.5                   # friction coefficient: xDot = - c_f*xDot (aerodynamic+tire)
 
-    posInfo.s_target            = 19.11  #19.14#17.94#17.76#24.0 #m: Was 5.0 before
+    posInfo.s_target            = 21.27  #19.11  #19.14#17.94#17.76#24.0 #m: Was 5.0 before
 
     oldTraj.oldTraj             = NaN*ones(buffersize,7,30)
     oldTraj.oldInput            = zeros(buffersize,2,30)
