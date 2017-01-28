@@ -17,11 +17,11 @@ function coeffConstraintCost(mpcTraj::MpcTrajectory, mpcCoeff::MpcCoeff, posInfo
 
     selected_laps = zeros(Int64,2)
     selected_laps[1] = lapStatus.currentLap-1                                   # use previous lap
-    selected_laps[2] = lapStatus.currentLap-2                                   # and the one before
+     selected_laps[2] = lapStatus.currentLap-2                                   # and the one before
     # TODO: Undo comment: He should actually take best lap
-    # if lapStatus.currentLap >= 4
-    #     selected_laps[2] = indmin(mpcTraj.cost[1,2:lapStatus.currentLap-2])+1      # and the best from all previous laps
-    # end
+     if lapStatus.currentLap >= 4
+         selected_laps[2] = indmin(mpcTraj.cost[1,1,2:lapStatus.currentLap-2])+1      # and the best from all previous laps
+     end
 
     xfRange = zeros(2,2)
     # Redo component calculation for the two selected_laps
@@ -63,7 +63,7 @@ function coeffConstraintCost(mpcTraj::MpcTrajectory, mpcCoeff::MpcCoeff, posInfo
         # The Q-function contains for every point in the sampled safe set the minimum cost-to-go-value
         # These values are calculated for both old trajectories
 
-        costVector = mpcTraj.cost[vec_range,lapNum]                               # decreases in equal steps
+        costVector = mpcTraj.cost[vec_range,1,lapNum]                               # decreases in equal steps
         mpcCoeff.coeffCost[:,kkk] = MatrixInterp[:,:]\costVector           # interpolate this vector with the given s
     end
     return (xfRange,selected_laps)

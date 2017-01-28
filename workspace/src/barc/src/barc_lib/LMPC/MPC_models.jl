@@ -16,10 +16,11 @@ type MpcModel
     derivCost::JuMP.NonlinearExpression
     controlCost::JuMP.NonlinearExpression
     modelErrorCost::JuMP.NonlinearExpression
+    stageCost::JuMP.NonlinearExpression
 
     uPrev::Array{JuMP.NonlinearParameter,2}
 
-    function MpcModel(mpcParams::MpcParams,mpcCoeff::MpcCoeff,modelParams::ModelParams,trackCoeff::TrackCoeff)
+    function MpcModel(mpcParams::MpcParams,mpcCoeff::MpcCoeff,modelParams::ModelParams,trackCoeff::TrackCoeff,posInfo::PosInfo)
         m = new()
         dt   = modelParams.dt
         L_a  = modelParams.l_A 
@@ -53,14 +54,14 @@ type MpcModel
 
         n_poly_curv = trackCoeff.nPolyCurvature         # polynomial degree of curvature approximation
         
-
+        s_target         = posInfo.s_target
 
         mdl = Model(solver = IpoptSolver(print_level=0,max_cpu_time=0.08))#,check_derivatives_for_naninf="yes"))#,linear_solver="ma57",print_user_options="yes"))
 
         @variable( mdl, z_Ol[1:(N+1),1:7])
         @variable( mdl, u_Ol[1:N,1:3])
         @variable( mdl, 0 <= ParInt <= 1)
-        @variable( mdl, eps[1:N+1] >= 0) # eps for soft lane constraints
+        @variable(mdl, eps[1:6] >=0)    # for soft constraints
 
         z_lb_4s = ones(mpcParams.N+1,1)*[-Inf -Inf -Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
         z_ub_4s = ones(mpcParams.N+1,1)*[Inf  Inf Inf  Inf  Inf Inf Inf]                      # upper bounds
@@ -93,8 +94,8 @@ type MpcModel
         @NLconstraint(mdl,          z_Ol[1,6] == z0[3])
         @NLconstraint(mdl,          z_Ol[1,7] == z0[7])
 
-        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] <= ey_max + eps[i])
-        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] >= -ey_max - eps[i])
+        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] <= ey_max + eps[5])
+        @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] >= -ey_max - eps[6])
 
         @NLexpression(mdl, c[i = 1:N], sum{coeff[j]*z_Ol[i,1]^(n_poly_curv-j+1),j=1:n_poly_curv} + coeff[n_poly_curv+1])
         #@NLexpression(mdl, dsdt[i = 1:N], (z_Ol[i,1]*cos(z_Ol[i,4]) - z_Ol[i,2]*sin(z_Ol[i,4]))/(1-z_Ol[i,5]*c[i]))
@@ -139,40 +140,52 @@ type MpcModel
             @NLconstraint(mdl, u_Ol[i+1,2]-u_Ol[i,2] >= -0.06)
         end
 
+
+        # Terminal constraints (soft), starting from 2nd lap
+        # ---------------------------------
+        for j = 1:4
+            @NLconstraint(mdl, (ParInt*(sum{coeffTermConst[i,1,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,1,j])+(1-ParInt)*(sum{coeffTermConst[i,2,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,2,j])-z_Ol[N+1,j+1])^2 <= eps[j])
+        end
+
+
         # Cost functions
 
         # Derivative cost
         # ---------------------------------
-        @NLexpression(mdl, derivCost, sum{QderivZ[j]*(sum{(z_Ol[i,j]-z_Ol[i+1,j])^2,i=1:N}),j=1:4} +
+        @NLexpression(mdl, derivCost, sum{QderivZ[j]*(sum{(z_Ol[i,j]-z_Ol[i+1,j])^2,i=1:N}),j=1:5} +
                                           QderivU[1]*((uPrev[1,1]-u_Ol[1,1])^2+sum{(u_Ol[i,1]-u_Ol[i+1,1])^2,i=1:N-delay_a-1})+
-                                          QderivU[2]*((uPrev[1,2]-u_Ol[1,2])^2+sum{(u_Ol[i,2]-u_Ol[i+1,2])^2,i=1:N-delay_df-1}))
+                                          QderivU[2]*((uPrev[1,2]-u_Ol[1,2])^2+sum{(u_Ol[i,2]-u_Ol[i+1,2])^2,i=1:N-delay_df-1})+
+                                          QderivU[3]*sum{(u_Ol[i+1,3]-u_Ol[i,3])^2,i=1:N-1})
 
         # Lane cost
         # ---------------------------------
-        @NLexpression(mdl, laneCost, sum{20*eps[i]+200*eps[i]^2,i=2:N+1}) #m: FIXME improve soft constraint not for every i a new eps
+        @NLexpression(mdl, laneCost, 200*eps[5]+2000*eps[5]^2 + 200*eps[6]+2000*eps[6]^2) 
 
         # Control Input cost
         # ---------------------------------
-        @NLexpression(mdl, controlCost, R[1]*sum{(u_Ol[i,1])^2,i=1:N-delay_a}+
-                                        R[2]*sum{(u_Ol[i,2])^2,i=1:N-delay_df})
+        # @NLexpression(mdl, controlCost, R[1]*sum{(u_Ol[i,1])^2,i=1:N-delay_a}+
+        #                                 R[2]*sum{(u_Ol[i,2])^2,i=1:N-delay_df})
+        @NLexpression(mdl, controlCost,0)
+        # Violation of soft terminal constraint
+        # ---------------------------------         
+        @NLexpression(mdl, constZTerm, sum{Q_term[j]*(eps[j]+eps[j]^2),j=1:4})
 
-        # Terminal constraints (soft), starting from 2nd lap
-        # ---------------------------------
-        @NLexpression(mdl, constZTerm, sum{Q_term[j]*(ParInt*(sum{coeffTermConst[i,1,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,1,j])+
-                                        (1-ParInt)*(sum{coeffTermConst[i,2,j]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermConst[order+1,2,j])-z_Ol[N+1,j+1])^2,j=1:4})
-        
         # Terminal cost
         # ---------------------------------
         # The value of this cost determines how fast the algorithm learns. The higher this cost, the faster the control tries to reach the finish line.
         @NLexpression(mdl, costZTerm,  (ParInt*(sum{coeffTermCost[i,1]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,1])+
                                       (1-ParInt)*(sum{coeffTermCost[i,2]*z_Ol[N+1,1]^(order+1-i),i=1:order}+coeffTermCost[order+1,2])))
 
+        # Main cost
+        #@NLexpression(mdl,stageCost, Q_term_cost*sum{(-0.5*tanh(10.0*((z_Ol[i,1]-s_target)))+0.5), i=1:(N+1)} ) 
+        @NLexpression(mdl,stageCost, 0) 
+
         # Model error cost (deviation in steering error e_ψ from reference model)
         # ---------------------------------
         @NLexpression(mdl, modelErrorCost, Q_modelError*sum{(z_Ol[j,6]-z_Ol[j,3])^2,j=1:N+1})
 
         # Solve model once
-        @NLobjective(mdl, Min, derivCost + constZTerm + costZTerm + laneCost + Q_term_cost + modelErrorCost)
+        @NLobjective(mdl, Min,  derivCost + constZTerm + costZTerm + laneCost + modelErrorCost + stageCost) # + controlCost) #TODO: Add stagecost back in
         sol_stat=solve(mdl)
         println("Finished solve 1: $sol_stat")
         sol_stat=solve(mdl)
@@ -184,16 +197,16 @@ type MpcModel
         m.u_Ol = u_Ol
         m.ParInt = ParInt
         m.uPrev = uPrev
-
-        m.coeffTermCost = coeffTermCost
+         m.coeffTermCost = coeffTermCost
         m.coeffTermConst = coeffTermConst
 
+        m.stageCost = stageCost
         m.derivCost = derivCost
         m.controlCost = controlCost
-        m.laneCost = laneCost
-        m.constZTerm = constZTerm
-        m.costZTerm  = costZTerm
         m.modelErrorCost  = modelErrorCost
+        m.costZTerm  = costZTerm
+        m.constZTerm = constZTerm
+        m.laneCost = laneCost
 
         return m
     end

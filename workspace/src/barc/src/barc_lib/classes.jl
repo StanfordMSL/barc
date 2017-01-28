@@ -47,7 +47,8 @@ type MpcTrajectory
     count::Array{Int64}
     xfRange::Array{Int64}
     selected_Laps::Array{Int64}
-    MpcTrajectory(closedLoopSEY=Float64[],inputHistory=Float64[],xfStates=Float64[],cost=Float64[],idx_end=Int64[],count=Int64[],xfRange=Int64[],selected_Laps=Int64[]) = new(closedLoopSEY,inputHistory,xfStates,cost,idx_end,count,xfRange,selected_Laps)
+    epsiRef::Array{Float64}
+    MpcTrajectory(closedLoopSEY=Float64[],inputHistory=Float64[],xfStates=Float64[],cost=Float64[],idx_end=Int64[],count=Int64[],xfRange=Int64[],selected_Laps=Int64[],epsiRef=Float64[]) = new(closedLoopSEY,inputHistory,xfStates,cost,idx_end,count,xfRange,selected_Laps,epsiRef)
 end
 type MpcParams          # parameters for MPC solver
     N::Int64

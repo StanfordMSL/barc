@@ -42,8 +42,8 @@ function solveMpcProblem(mdl::MpcModel,mpcSol::MpcSol,mpcCoeff::MpcCoeff,mpcPara
     mpcSol.u   = sol_u
     mpcSol.z   = sol_z
     mpcSol.solverStatus = sol_status
-    mpcSol.cost = zeros(7)
-    mpcSol.cost = [0,getvalue(mdl.costZTerm),getvalue(mdl.constZTerm),getvalue(mdl.derivCost),0,getvalue(mdl.laneCost),getvalue(mdl.modelErrorCost)]
+    mpcSol.cost = zeros(8)
+    mpcSol.cost = [getobjectivevalue(mdl.mdl),getvalue(mdl.stageCost),getvalue(mdl.derivCost),getvalue(mdl.controlCost),getvalue(mdl.modelErrorCost),getvalue(mdl.costZTerm),getvalue(mdl.constZTerm),getvalue(mdl.laneCost)]
     mpcSol.ParInt = getvalue(mdl.ParInt)
 
     # Print information
@@ -96,7 +96,7 @@ function solveMpcProblem_pathFollow(mdl::MpcModel_pF,mpcSol::MpcSol,mpcParams::M
     mpcSol.u   = sol_u
     mpcSol.z   = sol_z
     mpcSol.solverStatus = sol_status
-    mpcSol.cost = zeros(7)
+    mpcSol.cost = zeros(8)
     #mpcSol.cost = [getvalue(mdl.costZ),0,0,getvalue(mdl.derivCost),getvalue(mdl.controlCost),0]
 
     # Print information
