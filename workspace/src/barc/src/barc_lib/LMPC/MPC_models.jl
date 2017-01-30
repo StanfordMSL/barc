@@ -65,8 +65,8 @@ type MpcModel
 
         z_lb_4s = ones(mpcParams.N+1,1)*[-Inf -Inf -Inf -Inf -Inf -Inf -Inf]                      # lower bounds on states
         z_ub_4s = ones(mpcParams.N+1,1)*[Inf  Inf Inf  Inf  Inf Inf Inf]                      # upper bounds
-        u_lb_4s = ones(mpcParams.N,1) * [-1.0 -0.3 -2.0]                                         # lower bounds on inputs
-        u_ub_4s = ones(mpcParams.N,1) * [2.0 0.3 2.0]                                         # upper bounds
+        u_lb_4s = ones(mpcParams.N,1) * [-1.0 -0.3 -20.0]                                         # lower bounds on inputs
+        u_ub_4s = ones(mpcParams.N,1) * [2.0 0.3 20.0]                                         # upper bounds
 
         for i=1:3
             for j=1:N
@@ -91,7 +91,7 @@ type MpcModel
         setvalue(z0[1],1)   #m: Necessary? FIXME
 
         @NLconstraint(mdl, [i=1:5], z_Ol[1,i] == z0[i])
-        @NLconstraint(mdl,          z_Ol[1,6] == z0[3])
+        @NLconstraint(mdl,          z_Ol[1,6] == z0[6])
         @NLconstraint(mdl,          z_Ol[1,7] == z0[7])
 
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] <= ey_max + eps[5])

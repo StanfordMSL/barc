@@ -464,13 +464,14 @@ function eval_LMPC(code::AbstractString)
     plot(track[:,1],track[:,2],"b.",track[:,3],track[:,4],"r-",track[:,5],track[:,6],"r-")
     axis("equal")
     grid(1)
+    # uncommented by michael
     # HERE YOU CAN CHOOSE TO PLOT DIFFERENT DATA:
     # CURRENT HEADING (PLOTTED BY A LINE)
-    for i=1:10:size(pos_info.t,1)
-        dir = [cos(pos_info.z[i,10]) sin(pos_info.z[i,10])]
-        lin = [pos_info.z[i,6:7]; pos_info.z[i,6:7] + 0.1*dir]
-        plot(lin[:,1],lin[:,2],"-+")
-    end
+    # for i=1:10:size(pos_info.t,1)
+    #     dir = [cos(pos_info.z[i,10]) sin(pos_info.z[i,10])]
+    #     lin = [pos_info.z[i,6:7]; pos_info.z[i,6:7] + 0.1*dir]
+    #     plot(lin[:,1],lin[:,2],"-+")
+    # end
 
     # PREDICTED PATH
     # for i=1:4:size(x_est,1)

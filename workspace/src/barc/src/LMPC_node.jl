@@ -59,7 +59,7 @@ function computeCost!(mpcTraj::MpcTrajectory,lapStatus::LapStatus,posInfo::PosIn
     QderivZ         = mpcParams.QderivZ          
     QderivU         = mpcParams.QderivU               
     Q_modelError    = mpcParams.Q_modelError
-    rhoRef         = 1.0/modelParams.l_A
+    rhoRef          = 1.0/modelParams.l_A
     # get trajectories (extract only relevant data)
     data_end = mpcTraj.idx_end[lapNum]
     stateHistory = mpcTraj.closedLoopSEY[1:data_end,:,lapNum]
@@ -116,15 +116,14 @@ function evaluateTerminalConstraint(mpcSol::MpcSol,mpcCoeff::MpcCoeff,mpcParams:
     ss = mpcCoeff.coeffConst #safe set approximation polynomial coefficients
     sF = mpcSol.z[N+1,1]
 
-    # ey_F = (ParInt*(sF^5*ss[1,1,1]+sF^4*ss[2,1,1]+sF^3*ss[3,1,1]+sF^2*ss[4,1,1]+sF*ss[5,1,1]+ss[6,1,1]) + (1-ParInt)*(sF^5*ss[1,2,1]+sF^4*ss[2,2,1]+sF^3*ss[3,2,1]+sF^2*ss[4,2,1]+sF*ss[5,2,1]+ss[6,2,1]))
+    ey_F = (ParInt*(sF^5*ss[1,1,1]+sF^4*ss[2,1,1]+sF^3*ss[3,1,1]+sF^2*ss[4,1,1]+sF*ss[5,1,1]+ss[6,1,1]) + (1-ParInt)*(sF^5*ss[1,2,1]+sF^4*ss[2,2,1]+sF^3*ss[3,2,1]+sF^2*ss[4,2,1]+sF*ss[5,2,1]+ss[6,2,1]))
 
-    # epsi_F = (ParInt*(sF^5*ss[1,1,2]+sF^4*ss[2,1,2]+sF^3*ss[3,1,2]+sF^2*ss[4,1,2]+sF*ss[5,1,2]+ss[6,1,2]) + (1-ParInt)*(sF^5*ss[1,2,2]+sF^4*ss[2,2,2]+sF^3*ss[3,2,2]+sF^2*ss[4,2,2]+sF*ss[5,2,2]+ss[6,2,2]))
+    epsi_F = (ParInt*(sF^5*ss[1,1,2]+sF^4*ss[2,1,2]+sF^3*ss[3,1,2]+sF^2*ss[4,1,2]+sF*ss[5,1,2]+ss[6,1,2]) + (1-ParInt)*(sF^5*ss[1,2,2]+sF^4*ss[2,2,2]+sF^3*ss[3,2,2]+sF^2*ss[4,2,2]+sF*ss[5,2,2]+ss[6,2,2]))
 
-    # v_F = (ParInt*(sF^5*ss[1,1,3]+sF^4*ss[2,1,3]+sF^3*ss[3,1,3]+sF^2*ss[4,1,3]+sF*ss[5,1,3]+ss[6,1,3]) + (1-ParInt)*(sF^5*ss[1,2,3]+sF^4*ss[2,2,3]+sF^3*ss[3,2,3]+sF^2*ss[4,2,3]+sF*ss[5,2,3]+ss[6,2,3]))
+    v_F = (ParInt*(sF^5*ss[1,1,3]+sF^4*ss[2,1,3]+sF^3*ss[3,1,3]+sF^2*ss[4,1,3]+sF*ss[5,1,3]+ss[6,1,3]) + (1-ParInt)*(sF^5*ss[1,2,3]+sF^4*ss[2,2,3]+sF^3*ss[3,2,3]+sF^2*ss[4,2,3]+sF*ss[5,2,3]+ss[6,2,3]))
 
-    # rho_F = (ParInt*(sF^5*ss[1,1,4]+sF^4*ss[2,1,4]+sF^3*ss[3,1,4]+sF^2*ss[4,1,4]+sF*ss[5,1,4]+ss[6,1,4]) + (1-ParInt)*(sF^5*ss[1,2,4]+sF^4*ss[2,2,4]+sF^3*ss[3,2,4]+sF^2*ss[4,2,4]+sF*ss[5,2,4]+ss[6,2,4]))
-    xF = zeros(5)
-    #xF = [sF;ey_F;epsi_F;v_F;rho_F]
+    rho_F = (ParInt*(sF^5*ss[1,1,4]+sF^4*ss[2,1,4]+sF^3*ss[3,1,4]+sF^2*ss[4,1,4]+sF*ss[5,1,4]+ss[6,1,4]) + (1-ParInt)*(sF^5*ss[1,2,4]+sF^4*ss[2,2,4]+sF^3*ss[3,2,4]+sF^2*ss[4,2,4]+sF*ss[5,2,4]+ss[6,2,4]))
+    xF = [sF;ey_F;epsi_F;v_F;rho_F]
     return xF
 end
 # This is the main function, it is called when the node is started.
@@ -320,6 +319,8 @@ function main()
                 epsiRef[1] = mpcSol.z[2,3] #same as epsi
                 z0 = [mpcSol.z[1,1:4]';rhoRef;mpcSol.z[1,3];acc_f[1]]
                 u0 = [mpcSol.u[1,1:2]';0.0]
+                mpcTraj.epsiRef[mpcTraj.count[lapStatus.currentLap],lapStatus.currentLap] = mpcSol.z[2,3]
+
             else                        # otherwise: use adaptive kinematic model
                 zCurr[i,7] = acc0
                 zLMPC = [zCurr[i,1:6]';acc0]    
