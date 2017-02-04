@@ -203,7 +203,7 @@ function plotPositions(code::AbstractString)
     if numLaps < 1; error("At least one lap has to be completed succesfully!") end
 
       CM = ColorManager()
-      toggle_mum(CM)
+      #toggle_mum(CM)
       # plot data  
       fig = figure(888,facecolor="white")
       title("Cost for each lap",fontsize=30)
@@ -321,7 +321,7 @@ function plotPositions(code::AbstractString)
       if numLaps < 1; error("At least one lap has to be completed succesfully!") end
 
         CM = ColorManager()
-        toggle_mum(CM)
+        #toggle_mum(CM)
         # plot data  
         fig = figure(777,facecolor="white")
         title("Inputs",fontsize=30)

@@ -5,7 +5,7 @@ type MpcModel
     coeff::Array{JuMP.NonlinearParameter,1}
     coeffTermConst::Array{JuMP.NonlinearParameter,3}
     coeffTermCost::Array{JuMP.NonlinearParameter,2}
-
+    c::Array{JuMP.NonlinearExpression,1}
     z_Ol::Array{JuMP.Variable,2}
     u_Ol::Array{JuMP.Variable,2}
     ParInt::JuMP.Variable
@@ -90,9 +90,9 @@ type MpcModel
         # Conditions for first solve:
         setvalue(z0[1],1)   #m: Necessary? FIXME
 
-        @NLconstraint(mdl, [i=1:5], z_Ol[1,i] == z0[i])
-        @NLconstraint(mdl,          z_Ol[1,6] == z0[6])
-        @NLconstraint(mdl,          z_Ol[1,7] == z0[7])
+        @NLconstraint(mdl, [i=1:7], z_Ol[1,i] == z0[i])
+   
+        @NLconstraint(mdl, [i=1:N+1], 6 <= z_Ol[i,5]  <= 15 )
 
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] <= ey_max + eps[5])
         @NLconstraint(mdl, [i=1:N+1], z_Ol[i,2] >= -ey_max - eps[6])
@@ -128,7 +128,7 @@ type MpcModel
             @NLconstraint(mdl, z_Ol[i+1,3] == z_Ol[i,3] + dt*(z_Ol[i,4]*z_Ol[i+1,5]*sin(bta[i])-dsdt[i]*c[i])  )               # epsi
             @NLconstraint(mdl, z_Ol[i+1,4] == z_Ol[i,4] + dt*(z_Ol[i,7] - 0.5*z_Ol[i,4]))  # v
             @NLconstraint(mdl, z_Ol[i+1,5] == z_Ol[i,5] + dt*u_Ol[i,3] )            # rho_est
-            @NLconstraint(mdl, z_Ol[i+1,6] == z_Ol[i,6] + dt*(z_Ol[i,4]/Lref*sin(bta[i])-c[i])*z_Ol[i,4]*cos(z_Ol[i,6]+bta[i])/(1-z_Ol[i,2]*c[i]) )  # epsi_ref
+            @NLconstraint(mdl, z_Ol[i+1,6] == z_Ol[i,6] + dt*(z_Ol[i,4]/Lref*sin(bta[i])-c[i]*z_Ol[i,4]*cos(z_Ol[i,6]+bta[i])/(1-z_Ol[i,2]*c[i]) )  )# epsi_ref
 
         end
 
@@ -159,7 +159,7 @@ type MpcModel
 
         # Lane cost
         # ---------------------------------
-        @NLexpression(mdl, laneCost, 200*eps[5]+2000*eps[5]^2 + 200*eps[6]+2000*eps[6]^2) 
+        @NLexpression(mdl, laneCost, 5000*eps[5]+5000*eps[5]^2 + 5000*eps[6]+5000*eps[6]^2) 
 
         # Control Input cost
         # ---------------------------------
@@ -199,6 +199,7 @@ type MpcModel
         m.uPrev = uPrev
          m.coeffTermCost = coeffTermCost
         m.coeffTermConst = coeffTermConst
+        m.c = c
 
         m.stageCost = stageCost
         m.derivCost = derivCost

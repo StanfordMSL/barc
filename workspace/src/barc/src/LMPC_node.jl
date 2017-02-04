@@ -59,12 +59,10 @@ function computeCost!(mpcTraj::MpcTrajectory,lapStatus::LapStatus,posInfo::PosIn
     QderivZ         = mpcParams.QderivZ          
     QderivU         = mpcParams.QderivU               
     Q_modelError    = mpcParams.Q_modelError
-    rhoRef          = 1.0/modelParams.l_A
     # get trajectories (extract only relevant data)
     data_end = mpcTraj.idx_end[lapNum]
     stateHistory = mpcTraj.closedLoopSEY[1:data_end,:,lapNum]
     inputHistory = mpcTraj.inputHistory[1:data_end,:,lapNum]
-    epsiRefHistory = mpcTraj.epsiRef[1:data_end,lapNum]
     # compute costs recursively, starting with the the last state with s < lapLength 
     # (note: for all other states that come after the finish line a cost of 0 is assumed (default value in array))
     for iii in data_end:-1:1
@@ -76,7 +74,7 @@ function computeCost!(mpcTraj::MpcTrajectory,lapStatus::LapStatus,posInfo::PosIn
             epsiRef = stateHistory[iii,3]
 
         else
-            epsiRef = epsiRefHistory[iii-1]
+            epsiRef = stateHistory[iii-1,6]
             derivCost = 0.0
             for j = 1:5
                 derivCost += QderivZ[j]*(stateHistory[iii,j] - stateHistory[iii-1,j])^2
@@ -91,7 +89,6 @@ function computeCost!(mpcTraj::MpcTrajectory,lapStatus::LapStatus,posInfo::PosIn
             controlCost += R[j]*(inputHistory[iii,j])^2
         end
         modelErrorCost = Q_modelError*(stateHistory[iii,3]-epsiRef)^2
-        #modelErrorCost = Q_modelError*(stateHistory[iii,5]-rhoRef)^2
         # -------------------------------------------------------------------------
 
         if s >= posInfo.s_target
@@ -126,6 +123,39 @@ function evaluateTerminalConstraint(mpcSol::MpcSol,mpcCoeff::MpcCoeff,mpcParams:
     xF = [sF;ey_F;epsi_F;v_F;rho_F]
     return xF
 end
+
+function simulateReferenceModel(states::Array{Float64},inputs::Array{Float64},kappa::Float64,modelParams::ModelParams)
+    # get inputs
+    a = inputs[1]
+    deltaF = inputs[2]
+
+    # get sampling time and vehicle geometry
+    dt = modelParams.dt
+    lRef = modelParams.l_A
+
+    # determine slip angle betaF (angle between vehicle axis and
+    # velocity vector of c.g.)
+    betaF = atan(1/2*tan(deltaF)) 
+
+    # determine current system states
+    s = states[1]
+    eY = states[2]
+    ePsi = states[3]
+    v = states[4]
+
+    # calculate next states
+    dsdt = (v*cos(betaF + ePsi))/(1-kappa*eY)
+    s_next = s + dt * dsdt
+    eY_next = eY + dt * (v*sin(betaF + ePsi))
+    ePsi_next = ePsi + dt * (v/(lRef)*sin(betaF) - kappa*dsdt)
+    v_next = v + dt * a
+
+    # return new states
+    #states = [s_next;eY_next;ePsi_next;v_next]
+    return ePsi_next
+  end  
+
+
 # This is the main function, it is called when the node is started.
 function main()
 
@@ -316,10 +346,9 @@ function main()
                 solveMpcProblem_pathFollow(mdl_pF,mpcSol,mpcParams_pF,trackCoeff,posInfo,modelParams,z_pf,uPrev)
                 acc_f[1] = mpcSol.z[1,5]
                 acc0 = mpcSol.z[2,5]
-                epsiRef[1] = mpcSol.z[2,3] #same as epsi
-                z0 = [mpcSol.z[1,1:4]';rhoRef;mpcSol.z[1,3];acc_f[1]]
+                epsiRef[1] = mpcSol.z[2,3] #o.l. prediction of epsi
+                z0 = [mpcSol.z[1,1:4]';rhoRef;mpcSol.z[2,3];acc_f[1]]
                 u0 = [mpcSol.u[1,1:2]';0.0]
-                mpcTraj.epsiRef[mpcTraj.count[lapStatus.currentLap],lapStatus.currentLap] = mpcSol.z[2,3]
 
             else                        # otherwise: use adaptive kinematic model
                 zCurr[i,7] = acc0
@@ -328,11 +357,11 @@ function main()
                 acc0 = mpcSol.z[2,7]
                 acc_f[1] = mpcSol.z[1,7]
                 rhoEst[1] = mpcSol.z[2,5]
-                epsiRef[1] = mpcSol.z[2,6]
+                kappaHat = getvalue(mdl.c[1])
                 z0 = mpcSol.z[1,:]
                 u0 = mpcSol.u[1,:]
+                epsiRef[1] = simulateReferenceModel(z0,u0,kappaHat,modelParams)
                 mpcTraj.xfStates[mpcTraj.count[lapStatus.currentLap],:,lapStatus.currentLap] = evaluateTerminalConstraint(mpcSol,mpcCoeff,mpcParams)
-                mpcTraj.epsiRef[mpcTraj.count[lapStatus.currentLap],lapStatus.currentLap] = mpcSol.z[2,6]
             end
 
             #  ======================================= Save States for Safe Set =======================================
@@ -347,9 +376,6 @@ function main()
                 mpcTraj.closedLoopSEY[mpcTraj.count[lapStatus.currentLap-1],1,lapStatus.currentLap-1] += posInfo.s_target
                 mpcTraj.count[lapStatus.currentLap-1] += 1
             end
-
-
-
 
             log_t_solv[k+1] = toq()
 
