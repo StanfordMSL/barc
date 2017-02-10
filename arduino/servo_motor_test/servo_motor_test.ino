@@ -2,6 +2,7 @@
 
 const int MOTOR_PIN = 11;
 const int SERVO_PIN= 12;
+int pos = 0;
 
 // Motor limits
 // TODO are these the real limits?
